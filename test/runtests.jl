@@ -1,22 +1,27 @@
 using KISSTraits
 using Base.Test
 
-typealias False Val{false}
-typealias True Val{true}
+trait = KISSTraits.trait
+
+# @test_throws MethodError trait(4)
+@test_throws ErrorException istrait(4)
 
 # definition & adding
 @traitdef Tr1{X}
-@test istrait(Tr1{Int})==False
+@test trait(Tr1{Int})==Not{Tr1{Int}}
+@test !istrait(Tr1{Int})
 @traitadd Tr1{Integer}
-@test istrait(Tr1{Int})==True
-@test istrait(Tr1{Bool})==True
-@test istrait(Tr1{String})==False
+@test trait(Tr1{Int})==Tr1{Int}
+@test istrait(Tr1{Int})
+@test trait(Tr1{Bool})==Tr1{Bool}
+@test trait(Tr1{String})==Not{Tr1{String}}
+@test !istrait(Tr1{String})
 
 @traitdef Tr2{X,Y}
-@test istrait(Tr2{Int,FloatingPoint})==False
+@test trait(Tr2{Int,FloatingPoint})==Not{Tr2{Int,FloatingPoint}}
 @traitadd Tr2{Integer, Float64}
-@test istrait(Tr2{Int, Float64})==True
-@test istrait(Tr2{Int, Float32})==False
+@test trait(Tr2{Int, Float64})==Tr2{Int, Float64}
+@test trait(Tr2{Int, Float32})==Not{Tr2{Int, Float32}}
 
 # trait functions
 @traitfn f{X; Tr1{X}}(x::X) = 1  # def 1
@@ -30,14 +35,15 @@ typealias True Val{true}
 @traitfn f{X,Y; !Tr2{X,Y}}(x::X,y::Y,z) = 2
 @test f(5,5, "a")==2
 
-# TODO:
-# this will overwrite the definition above
+# This will overwrite the definition def1 above
 @traitfn f{X; !Tr2{X,X}}(x::X) = 10
+@traitfn f{X; Tr2{X,X}}(x::X) = 100
 @test f(5)==10
 @test f(5.)==10
 @traitadd Tr2{Integer, Integer}
-@traitfn f{X; !Tr2{X,X}}(x::X) = 10 # update cache
-@test f(5)==1 # this now goes to (def 1)
+@test f(5.)==10
+@test !(f(5)==100)
+# need to update method cache:
 @traitfn f{X; Tr2{X,X}}(x::X) = 100
 @test f(5)==100
 @test f(5.)==10
