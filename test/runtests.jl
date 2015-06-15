@@ -47,3 +47,8 @@ trait = SimpleTraits.trait
 @traitfn f{X; Tr2{X,X}}(x::X) = 100
 @test f(5)==100
 @test f(5.)==10
+
+######
+# Other tests
+#####
+include("base-traits.jl")

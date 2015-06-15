@@ -112,4 +112,10 @@ Base.next(::GenerateTypeVars{:upcase}, state) = (symbol("X$state"), state+1) # X
 Base.next(::GenerateTypeVars{:lcase}, state) = (symbol("x$state"), state+1)  # x1,...
 Base.done(::GenerateTypeVars, state) = false
 
+####
+# Extras
+####
+
+include("base-traits.jl")
+
 end # module
