@@ -17,7 +17,7 @@ staying compatible.  It drops support for:
 The reason for splitting this away from Traits.jl are:
 
 - creating a more reliable and easier to maintain package than
-  Traits.jl is
+  Traits.jl
 - exploring inclusion in Base
 
 # Manual
@@ -40,7 +40,7 @@ Functions which dispatch on traits are constructed like:
 ```
 This means that a type `X` which is part of the trait `Tr1` will
 dispatch to the method returning `1`.
-``julia
+```julia
 @test f(5)==1
 @test f(5.)==2
 ```
@@ -48,14 +48,15 @@ dispatch to the method returning `1`.
 Similarly for `Tr2`:
 ```julia
 @traitfn f{X,Y; Tr2{X,Y}}(x::X,y::Y,z) = 1
-@test f(5,5., "a")==1
+@test f(5, 5., "a")==1
 @test_throws MethodError f(5,5, "a")==2
 @traitfn f{X,Y; !Tr2{X,Y}}(x::X,y::Y,z) = 2
 @test f(5,5, "a")==2
 ```
 
 Note that dispatch on traits can only work on one trait for a given
-signature.  For example this does not work as one may expect:
+signature.  Continuing above example, this does not work as one may
+expect:
 ```julia
 @traitfn f{X; !Tr2{X,X}}(x::X) = 10
 ```
@@ -70,13 +71,13 @@ programmed.  Running `@traitadd Tr1{Int}` essentially expands to
 ```julia
 SimpleTraits.trait{X1 <: Int}(::Type{Tr1{X1}}) = Tr1{X1}
 ```
-i.e. it is just the id function.  So instead of using `@traitadd` this
+i.e. it is just the identity function.  So instead of using `@traitadd` this
 can be coded directly.  Note that anything but a constant function
 will probably not be inlined away by the JIT and will lead to slower
 dynamic dispatch.
 
 Example leading to dynamic dispatch:
-```
+```julia
 @traitdef IsBits{X}
 SimpleTraits.trait{X1}(::Type{IsBits{X1}}) = isbits(X1) ? IsBits{X1} : Not{IsBits{X1}}
 istrait(IsBits{Int}) # true
@@ -96,7 +97,7 @@ function:
 end
 ```
 
-Note that this feature can be combined with `@traitadd`.
+Note that this programmed-traits can be combined with `@traitadd`.
 
 # Base Traits
 
@@ -126,9 +127,11 @@ b2 = f(b)
 
 # References
 
-[Here](https://github.com/mauro3/Traits.jl#dispatch-on-traits) is an
-in-depth discussion on limitations of Holy-Traits, which this package
-is essentially a wrapper around.
+- [Traits.jl](https://github.com/mauro3/Traits.jl) and its references.
+  In particular
+  [here](https://github.com/mauro3/Traits.jl#dispatch-on-traits) is an
+  in-depth discussion on limitations of Holy-Traits, which this
+  package is essentially a wrapper around.
 
 # To ponder
 
