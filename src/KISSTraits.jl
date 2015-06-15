@@ -37,15 +37,14 @@ istrait{T<:Trait}(tr::Type{T}) = trait(tr)<:Not ? false : true # Problem, this c
 # Defining a trait
 # @traitdef Tr1{X,Y}
 macro traitdef(tr)
-    esc(:(immutable $tr <:KISSTraits.Trait end))
-   # :(immutable esc($tr) <:KISSTraits.Trait end)
+    :(immutable $(esc(tr)) <: Trait end)
 end
 
 # Adding types to a trait
 # @traitadd Tr1{Int,Float64}
 macro traitadd(tr)
     # makes
-    # trait{X1<:Int,X2<:Float64}(::Type{Tr1{X1,X2}})
+    # trait{X1<:Int,X2<:Float64}(::Type{Tr1{X1,X2}}) = Tr1{X1,X2}
     typs = tr.args[2:end]
     trname = tr.args[1]
     curly = Any[]
@@ -61,7 +60,7 @@ macro traitadd(tr)
         $fnhead = $trname{$(paras...)}
         $isfnhead = true # Add the istrait definition as otherwise
                          # method-caching can be an issue.
-        end)
+    end)
 end
 
 # Defining a function dispatching on the trait (or not)
@@ -80,7 +79,7 @@ function traitfn(tfn)
     trait = fhead.args[1].args[2].args[1]
     if isnegated(trait)
         trait = trait.args[2]
-        val = :(::Type{Not{$trait}})
+        val = :(::Type{KISSTraits.Not{$trait}})
     else
         val = :(::Type{$trait})
     end
@@ -112,6 +111,5 @@ Base.start(::GenerateTypeVars) = 1
 Base.next(::GenerateTypeVars{:upcase}, state) = (symbol("X$state"), state+1) # X1,..
 Base.next(::GenerateTypeVars{:lcase}, state) = (symbol("x$state"), state+1)  # x1,...
 Base.done(::GenerateTypeVars, state) = false
-             
-             
+
 end # module
