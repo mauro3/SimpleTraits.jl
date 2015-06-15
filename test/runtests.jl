@@ -1,7 +1,7 @@
-using KISSTraits
+using SimpleTraits
 using Base.Test
 
-trait = KISSTraits.trait
+trait = SimpleTraits.trait
 
 # @test_throws MethodError trait(4)
 @test_throws ErrorException istrait(4)

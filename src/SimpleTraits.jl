@@ -1,4 +1,4 @@
-module KISSTraits
+module SimpleTraits
 
 # This is basically just adding a few convenience functions & macros
 # around Holy Traits.
@@ -54,8 +54,8 @@ macro traitadd(tr)
         push!(paras, v)
     end
     arg = :(::Type{$trname{$(paras...)}})
-    fnhead = :(KISSTraits.trait{$(curly...)}($arg))
-    isfnhead = :(KISSTraits.istrait{$(curly...)}($arg))
+    fnhead = :(SimpleTraits.trait{$(curly...)}($arg))
+    isfnhead = :(SimpleTraits.istrait{$(curly...)}($arg))
     esc(quote
         $fnhead = $trname{$(paras...)}
         $isfnhead = true # Add the istrait definition as otherwise
@@ -79,12 +79,12 @@ function traitfn(tfn)
     trait = fhead.args[1].args[2].args[1]
     if isnegated(trait)
         trait = trait.args[2]
-        val = :(::Type{KISSTraits.Not{$trait}})
+        val = :(::Type{SimpleTraits.Not{$trait}})
     else
         val = :(::Type{$trait})
     end
     quote
-        $fname{$(typs...)}($(args...)) = $fname(KISSTraits.trait($trait), $(striparg(args)...))
+        $fname{$(typs...)}($(args...)) = $fname(SimpleTraits.trait($trait), $(striparg(args)...))
         $fname{$(typs...)}($val, $(args...)) = $fbody
     end
 end
