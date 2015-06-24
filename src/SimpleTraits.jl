@@ -10,17 +10,18 @@ export Trait, istrait, @traitdef, @traitadd, @traitfn, Not
 ## @doc """
 ## `abstract Trait{SUPER}`
 
-## All traits are direct decedents of abstract type Trait.  The type parameter
-## SUPER of Trait is needed to specify super-traits (a tuple).""" ->
+## All traits are subtypes of abstract type Trait.  (SUPER is not used
+## here but in Traits.jl)
 abstract Trait{SUPER}
 # a concrete Trait will look like
 ## immutable Tr1{X,Y} <: Trait end
 # where X and Y are the types involved in the trait.
 
-# The set of all types not belonging to a trait is encoded by, e.g.
-# Not{Tr1{X,Y}}
-immutable Not{T<:Trait} <: Trait end
-# stips an even number of Nots off: Not{Not{T}}->T
+# The set of all types not belonging to a trait is encoded by wrapping
+# it with Not{}, e.g.  Not{Tr1{X,Y}}
+abstract Not{T<:Trait} <: Trait
+
+# Helper to strip an even number of Not{}s off: Not{Not{T}}->T
 stripNot{T<:Trait}(Tr::Type{T}) = Tr
 function stripNot{T<:Not}(Tr::Type{T})
     Tr = T.parameters[1]
@@ -34,26 +35,27 @@ end
 # uses this.  Default for any type is that it is not fulfilled:
 trait{T<:Trait}(::Type{T}) = Not{T}
 function trait{T<:Not}(::Type{T})
+    # if it is a Not{...} then need to unravel it.
     Tr = stripNot(T)
     Tr = Tr<:Not ? Tr.parameters[1] : Tr # strip also last Not
     return trait(Tr)==Tr ? Tr : Not{Tr}
 end
 
-## Implement trait for specific types:
+## Under the hood, a trait is then implemented for specific types by
+## defining:
 #   trait(::Type{Tr1{Int,Float64}}) = Tr1{Int,Float64}
 # or
 #   trait{I<:Integer,F<:FloatingPoint}(::Type{Tr1{I,F}}) = Tr1{I,F}
 #
-# Note invariance, this does probably not the right thing:
+# Note due to invariance, this does probably not the right thing:
 #   trait(::Type{Tr1{Integer,FloatingPoint}}) = Tr1{Integer, FloatingPoint}
 
 # Function istrait checks whether a trait is fulfilled by a specific
-# set of types (builds on `trait`):
+# set of types (using the return of `trait`):
 ## istrait(Tr1{Int,Float64}) => return true or false
 istrait(::Any) = error("Argument is not a Trait.")
 istrait{T<:Trait}(tr::Type{T}) = trait(tr)==stripNot(tr) ? true : false # Problem, this can run into issue #265
-                                                                        # thus redefine when traits are defined
-
+                                                                        # thus is redefine when traits are defined
 # Defining a trait
 # @traitdef Tr1{X,Y}
 macro traitdef(tr)
