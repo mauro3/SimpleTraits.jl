@@ -17,6 +17,25 @@ trait = SimpleTraits.trait
 @test trait(Tr1{String})==Not{Tr1{String}}
 @test !istrait(Tr1{String})
 
+# Logic.  trait(Tr) returns the same trait Tr if it is fulfilled and
+# Not{Tr} otherwise.  This is a bit confusing.
+@test trait(Tr1{String})==Not{Tr1{String}}
+@test istrait(Tr1{String})==false
+@test trait(Not{Tr1{String}})==Not{Tr1{String}}
+@test istrait(Not{Tr1{String}})==true
+@test trait(Not{Not{Tr1{String}}})==Not{Tr1{String}}
+@test istrait(Not{Not{Tr1{String}}})==false
+@test trait(Not{Not{Not{Tr1{String}}}})==Not{Tr1{String}}
+@test istrait(Not{Not{Not{Tr1{String}}}})==true
+
+@test trait(Not{Tr1{Integer}})==Tr1{Integer}
+@test istrait(Not{Tr1{Integer}})==false
+@test trait(Not{Not{Tr1{Integer}}})==Tr1{Integer}
+@test istrait(Not{Not{Tr1{Integer}}})==true
+@test trait(Not{Not{Not{Tr1{Integer}}}})==Tr1{Integer}
+@test istrait(Not{Not{Not{Tr1{Integer}}}})==false
+
+
 @traitdef Tr2{X,Y}
 @test trait(Tr2{Int,FloatingPoint})==Not{Tr2{Int,FloatingPoint}}
 @traitadd Tr2{Integer, Float64}

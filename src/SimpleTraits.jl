@@ -4,8 +4,14 @@ module SimpleTraits
 # around Holy Traits.
 
 export Trait, istrait, @traitdef, @traitadd, @traitfn, Not
+
 # All traits are concrete subtypes of this trait.  SUPER is not used
 # but present to be compatible with Traits.jl.
+## @doc """
+## `abstract Trait{SUPER}`
+
+## All traits are direct decedents of abstract type Trait.  The type parameter
+## SUPER of Trait is needed to specify super-traits (a tuple).""" ->
 abstract Trait{SUPER}
 # a concrete Trait will look like
 ## immutable Tr1{X,Y} <: Trait end
@@ -14,12 +20,25 @@ abstract Trait{SUPER}
 # The set of all types not belonging to a trait is encoded by, e.g.
 # Not{Tr1{X,Y}}
 immutable Not{T<:Trait} <: Trait end
+# stips an even number of Nots off: Not{Not{T}}->T
+stripNot{T<:Trait}(Tr::Type{T}) = Tr
+function stripNot{T<:Not}(Tr::Type{T})
+    Tr = T.parameters[1]
+    Tr<:Trait || error("`Not` cannot be used without a `Trait` as parameter")
+    return Tr<:Not ? Tr.parameters[1] : T
+end
 
 # Transforms a type encoding a trait into itself if the trait is
 # fulfilled, or into Not{itself}.  It is used to define whether a
 # trait is implemented for a set of types or not.  Trait-dispatch then
 # uses this.  Default for any type is that it is not fulfilled:
 trait{T<:Trait}(::Type{T}) = Not{T}
+function trait{T<:Not}(::Type{T})
+    Tr = stripNot(T)
+    Tr = Tr<:Not ? Tr.parameters[1] : Tr # strip also last Not
+    return trait(Tr)==Tr ? Tr : Not{Tr}
+end
+
 ## Implement trait for specific types:
 #   trait(::Type{Tr1{Int,Float64}}) = Tr1{Int,Float64}
 # or
@@ -32,7 +51,8 @@ trait{T<:Trait}(::Type{T}) = Not{T}
 # set of types (builds on `trait`):
 ## istrait(Tr1{Int,Float64}) => return true or false
 istrait(::Any) = error("Argument is not a Trait.")
-istrait{T<:Trait}(tr::Type{T}) = trait(tr)<:Not ? false : true # Problem, this can run into issue #265
+istrait{T<:Trait}(tr::Type{T}) = trait(tr)==stripNot(tr) ? true : false # Problem, this can run into issue #265
+                                                                        # thus redefine when traits are defined
 
 # Defining a trait
 # @traitdef Tr1{X,Y}

@@ -4,7 +4,8 @@
 
 This attempts to reduce the complexity of
 [Traits.jl](https://github.com/mauro3/Traits.jl), but at the same time
-staying compatible.  It drops support for:
+staying compatible.  On the upside, it also works for Julia-0.3.  It
+drops support for:
 
 - Trait definition in terms of methods and constraints.  Instead the
   user needs to assign types to traits manually.  This removes the
