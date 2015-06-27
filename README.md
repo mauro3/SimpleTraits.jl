@@ -49,10 +49,10 @@ dispatch to the method returning `1`.
 Similarly for `Tr2`:
 ```julia
 @traitfn f{X,Y; Tr2{X,Y}}(x::X,y::Y,z) = 1
-@test f(5, 5., "a")==1
+@test f(5, "b", "a")==1
 @test_throws MethodError f(5,5, "a")==2
 @traitfn f{X,Y; !Tr2{X,Y}}(x::X,y::Y,z) = 2
-@test f(5,5, "a")==2
+@test f(5, 5, "a")==2
 ```
 
 Note that dispatch on traits can only work on one trait for a given
