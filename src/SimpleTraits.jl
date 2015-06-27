@@ -3,7 +3,7 @@ module SimpleTraits
 # This is basically just adding a few convenience functions & macros
 # around Holy Traits.
 
-export Trait, istrait, @traitdef, @traitadd, @traitfn, Not
+export Trait, istrait, @traitdef, @traitimpl, @traitfn, Not
 
 # All traits are concrete subtypes of this trait.  SUPER is not used
 # but present to be compatible with Traits.jl.
@@ -63,8 +63,8 @@ macro traitdef(tr)
 end
 
 # Adding types to a trait
-# @traitadd Tr1{Int,Float64}
-macro traitadd(tr)
+# @traitimpl Tr1{Int,Float64}
+macro traitimpl(tr)
     # makes
     # trait{X1<:Int,X2<:Float64}(::Type{Tr1{X1,X2}}) = Tr1{X1,X2}
     typs = tr.args[2:end]

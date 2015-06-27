@@ -10,7 +10,7 @@ trait = SimpleTraits.trait
 @traitdef Tr1{X}
 @test trait(Tr1{Int})==Not{Tr1{Int}}
 @test !istrait(Tr1{Int})
-@traitadd Tr1{Integer}
+@traitimpl Tr1{Integer}
 @test trait(Tr1{Int})==Tr1{Int}
 @test istrait(Tr1{Int})
 @test trait(Tr1{Bool})==Tr1{Bool}
@@ -38,7 +38,7 @@ trait = SimpleTraits.trait
 
 @traitdef Tr2{X,Y}
 @test trait(Tr2{Int,FloatingPoint})==Not{Tr2{Int,FloatingPoint}}
-@traitadd Tr2{Integer, Float64}
+@traitimpl Tr2{Integer, Float64}
 @test trait(Tr2{Int, Float64})==Tr2{Int, Float64}
 @test trait(Tr2{Int, Float32})==Not{Tr2{Int, Float32}}
 
@@ -59,7 +59,7 @@ trait = SimpleTraits.trait
 @traitfn f{X; Tr2{X,X}}(x::X) = 100
 @test f(5)==10
 @test f(5.)==10
-@traitadd Tr2{Integer, Integer}
+@traitimpl Tr2{Integer, Integer}
 @test f(5.)==10
 @test !(f(5)==100)
 # need to update method cache:
