@@ -4,6 +4,10 @@ using SimpleTraits.BaseTraits
 @test istrait(TAny{None})
 @test istrait(TAny{Int})
 
+@test !istrait(TNone{Any})
+@test !istrait(TNone{None})
+@test !istrait(TNone{Int})
+
 @test istrait(IsBits{Int})
 @test !istrait(IsBits{Vector{Int}})
 

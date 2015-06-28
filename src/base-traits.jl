@@ -1,7 +1,7 @@
 module BaseTraits
 using SimpleTraits
 export IsBits, IsImmutable, IsContiguous, IsFastLinearIndex, TAny,
-       IsCallable
+       TNone, IsCallable
 
 @traitdef IsBits{X}
 @traitdef IsImmutable{X}
@@ -24,6 +24,8 @@ end
 # Trait which contains all types
 @traitdef TAny{X}
 SimpleTraits.trait{X}(::Type{TAny{X}}) = TAny{X}
+# Trait which contains no types
+typealias TNone{X} Not{TAny{X}}
 
 if VERSION>v"0.4-" # use @generated functions
     @traitdef IsContiguous{X} # https://github.com/JuliaLang/julia/issues/10889
