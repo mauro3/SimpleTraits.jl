@@ -21,6 +21,9 @@ The reason for splitting this away from Traits.jl are:
   Traits.jl
 - exploring inclusion in Base
 
+My [*JuliaCon 2015*](https://youtu.be/j9w8oHfG1Ic) talk gives a 10
+minute introduction to Traits.jl and SimpleTraits.jl.
+
 # Manual
 
 Traits are defined with:
