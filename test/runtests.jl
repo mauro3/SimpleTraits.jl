@@ -14,19 +14,19 @@ trait = SimpleTraits.trait
 @test trait(Tr1{Int})==Tr1{Int}
 @test istrait(Tr1{Int})
 @test trait(Tr1{Bool})==Tr1{Bool}
-@test trait(Tr1{String})==Not{Tr1{String}}
-@test !istrait(Tr1{String})
+@test trait(Tr1{AbstractString})==Not{Tr1{AbstractString}}
+@test !istrait(Tr1{AbstractString})
 
 # Logic.  trait(Tr) returns the same trait Tr if it is fulfilled and
 # Not{Tr} otherwise.  This is a bit confusing.
-@test trait(Tr1{String})==Not{Tr1{String}}
-@test istrait(Tr1{String})==false
-@test trait(Not{Tr1{String}})==Not{Tr1{String}}
-@test istrait(Not{Tr1{String}})==true
-@test trait(Not{Not{Tr1{String}}})==Not{Tr1{String}}
-@test istrait(Not{Not{Tr1{String}}})==false
-@test trait(Not{Not{Not{Tr1{String}}}})==Not{Tr1{String}}
-@test istrait(Not{Not{Not{Tr1{String}}}})==true
+@test trait(Tr1{AbstractString})==Not{Tr1{AbstractString}}
+@test istrait(Tr1{AbstractString})==false
+@test trait(Not{Tr1{AbstractString}})==Not{Tr1{AbstractString}}
+@test istrait(Not{Tr1{AbstractString}})==true
+@test trait(Not{Not{Tr1{AbstractString}}})==Not{Tr1{AbstractString}}
+@test istrait(Not{Not{Tr1{AbstractString}}})==false
+@test trait(Not{Not{Not{Tr1{AbstractString}}}})==Not{Tr1{AbstractString}}
+@test istrait(Not{Not{Not{Tr1{AbstractString}}}})==true
 
 @test trait(Not{Tr1{Integer}})==Tr1{Integer}
 @test istrait(Not{Tr1{Integer}})==false
@@ -37,7 +37,7 @@ trait = SimpleTraits.trait
 
 
 @traitdef Tr2{X,Y}
-@test trait(Tr2{Int,FloatingPoint})==Not{Tr2{Int,FloatingPoint}}
+@test trait(Tr2{Int,AbstractFloat})==Not{Tr2{Int,AbstractFloat}}
 @traitimpl Tr2{Integer, Float64}
 @test trait(Tr2{Int, Float64})==Tr2{Int, Float64}
 @test trait(Tr2{Int, Float32})==Not{Tr2{Int, Float32}}
@@ -75,19 +75,10 @@ trait = SimpleTraits.trait
 # with macro
 @traitfn @inbounds gg{X; Tr1{X}}(x::X) = x
 @test gg(5)==5
-if VERSION<v"0.4"
-    # otherwise errors
-    macro generated(x)
-        x
-    end
-end
-if VERSION>v"0.4" # use @generated functions
-    @traitfn @generated ggg{X; Tr1{X}}(x::X) = X<:AbstractArray ? :(x+1) : :(x)
-    @test ggg(5)==5
-    @traitimpl Tr1{AbstractArray}
-    @test ggg([5])==[6]
-end
-
+@traitfn @generated ggg{X; Tr1{X}}(x::X) = X<:AbstractArray ? :(x+1) : :(x)
+@test ggg(5)==5
+@traitimpl Tr1{AbstractArray}
+@test ggg([5])==[6]
 
 ######
 # Other tests

@@ -2,6 +2,9 @@
 
 [![Build Status](https://travis-ci.org/mauro3/SimpleTraits.jl.svg?branch=master)](https://travis-ci.org/mauro3/SimpleTraits.jl)
 
+Note that Julia 0.3 is only supported up to tag
+[v0.0.1](https://github.com/mauro3/SimpleTraits.jl/tree/v0.0.1).
+
 This attempts to reduce the complexity of
 [Traits.jl](https://github.com/mauro3/Traits.jl), but at the same time
 staying compatible.  On the upside, it also works for Julia-0.3.  It

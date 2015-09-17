@@ -1,12 +1,12 @@
 using SimpleTraits.BaseTraits
 
-@test istrait(TAny{Any})
-@test istrait(TAny{None})
-@test istrait(TAny{Int})
+@test istrait(IsAnything{Any})
+@test istrait(IsAnything{None})
+@test istrait(IsAnything{Int})
 
-@test !istrait(TNone{Any})
-@test !istrait(TNone{None})
-@test !istrait(TNone{Int})
+@test !istrait(IsNothing{Any})
+@test !istrait(IsNothing{None})
+@test !istrait(IsNothing{Int})
 
 @test istrait(IsBits{Int})
 @test !istrait(IsBits{Vector{Int}})
