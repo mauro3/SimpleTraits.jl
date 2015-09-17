@@ -93,6 +93,13 @@ function traitfn(tfn)
     # Need
     # f{X,Y}(x::X,Y::Y) = f(trait(Tr1{X,Y}), x, y)
     # f(::False, x, y)= ...
+    if tfn.head==:macrocall
+        hasmac = true
+        mac = tfn.args[1]
+        tfn = tfn.args[2]
+    else
+        hasmac = false
+    end
     fhead = tfn.args[1]
     fbody = tfn.args[2]
     fname = fhead.args[1].args[1]
@@ -105,9 +112,13 @@ function traitfn(tfn)
     else
         val = :(::Type{$trait})
     end
+    fn = :($fname{$(typs...)}($val, $(args...)) = $fbody)
+    if hasmac
+        fn = :($(Expr(:macrocall, mac, fn)))
+    end
     quote
         $fname{$(typs...)}($(args...)) = $fname(SimpleTraits.trait($trait), $(striparg(args)...))
-        $fname{$(typs...)}($val, $(args...)) = $fbody
+        $fn
     end
 end
 macro traitfn(tfn)

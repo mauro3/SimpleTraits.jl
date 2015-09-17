@@ -67,6 +67,28 @@ trait = SimpleTraits.trait
 @test f(5)==100
 @test f(5.)==10
 
+# VarArg
+@traitfn g{X; Tr1{X}}(x::X, y...) = y
+@test g(5, 7, 8)==((7,8),)
+# @test g(5.0, 7, 8)==((7,8),) # hangs because of https://github.com/JuliaLang/julia/issues/13183
+
+# with macro
+@traitfn @inbounds gg{X; Tr1{X}}(x::X) = x
+@test gg(5)==5
+if VERSION<v"0.4"
+    # otherwise errors
+    macro generated(x)
+        x
+    end
+end
+if VERSION>v"0.4" # use @generated functions
+    @traitfn @generated ggg{X; Tr1{X}}(x::X) = X<:AbstractArray ? :(x+1) : :(x)
+    @test ggg(5)==5
+    @traitimpl Tr1{AbstractArray}
+    @test ggg([5])==[6]
+end
+
+
 ######
 # Other tests
 #####
