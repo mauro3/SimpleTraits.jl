@@ -112,7 +112,7 @@ function traitfn(tfn)
         fn = :($fname{$(typs...)}($val, $(args...)) = $fbody)
     end
     quote
-        $fname{$(typs...)}($(args...)) = (Base.@_inline_meta(); $fname($curmod.trait($trait), $(striparg(args)...)))
+        $fname{$(typs...)}($(args...)) = (Base.@_inline_meta(); $fname($curmod.trait($trait), $(stripType(striparg(args))...)))
         $fn
     end
 end
@@ -131,6 +131,11 @@ isnegated(t::Expr) = t.head==:call
 striparg(args::Vector) = [striparg(a) for a in args]
 striparg(a::Symbol) = a
 striparg(a::Expr) = a.args[1]
+
+# :(Type{X}) -> X, X->X
+stripType(args::Vector) = [stripType(a) for a in args]
+stripType(a::Symbol) = a
+stripType(a::Expr) = (a.head==:curly && a.args[1]==:Type) ? a.args[2] : a
 
 # generates: X1, X2,... or x1, x2.... (just symbols not actual TypeVar)
 type GenerateTypeVars{CASE}

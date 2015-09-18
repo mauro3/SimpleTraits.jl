@@ -80,6 +80,10 @@ trait = SimpleTraits.trait
 @traitimpl Tr1{AbstractArray}
 @test ggg([5])==[6]
 
+# traitfn with Type
+@traitfn ggt{X; Tr1{X}}(::Type{X}, y) = (X,y)
+@test ggt(Array, 5)==(Array, 5)
+
 ######
 # Other tests
 #####
