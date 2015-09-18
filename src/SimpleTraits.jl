@@ -101,16 +101,18 @@ function traitfn(tfn)
     trait = fhead.args[1].args[2].args[1]
     if isnegated(trait)
         trait = trait.args[2]
-        val = :(::Type{SimpleTraits.Not{$trait}})
+        val = :(::Type{$curmod.Not{$trait}})
     else
         val = :(::Type{$trait})
     end
-    fn = :($fname{$(typs...)}($val, $(args...)) = $fbody)
     if hasmac
-        fn = :($(Expr(:macrocall, mac, fn)))
+        fn = :(@dummy $fname{$(typs...)}($val, $(args...)) = $fbody)
+        fn.args[1] = mac
+    else
+        fn = :($fname{$(typs...)}($val, $(args...)) = $fbody)
     end
     quote
-        $fname{$(typs...)}($(args...)) = (Base.@_inline_meta(); $fname(SimpleTraits.trait($trait), $(striparg(args)...)))
+        $fname{$(typs...)}($(args...)) = (Base.@_inline_meta(); $fname($curmod.trait($trait), $(striparg(args)...)))
         $fn
     end
 end
