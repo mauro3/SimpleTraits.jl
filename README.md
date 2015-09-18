@@ -104,7 +104,12 @@ function:
 end
 ```
 
-Note that this programmed-traits can be combined with `@traitimpl`.
+Note that these programmed-traits can be combined with `@traitimpl`.
+
+Trait functions can be generated functions:
+```julia
+@traitfn @generated fg{X; Tr1{X}}(x::X) = (println(x); :x)
+```
 
 # Base Traits
 
@@ -146,4 +151,3 @@ b2 = f(b)
   ([Jutho's idea](https://github.com/JuliaLang/julia/issues/10889#issuecomment-94317470))?
   In particular could it be used in such a way that it is compatible
   with the multiple inheritance used in Traits.jl?
-- the current `@traitfn` cannot be used with `@generated`
