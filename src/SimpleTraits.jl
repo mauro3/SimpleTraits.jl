@@ -1,4 +1,5 @@
 module SimpleTraits
+const curmod = module_name(current_module())
 
 # This is basically just adding a few convenience functions & macros
 # around Holy Traits.
@@ -22,24 +23,16 @@ abstract Trait{SUPER}
 abstract Not{T<:Trait} <: Trait
 
 # Helper to strip an even number of Not{}s off: Not{Not{T}}->T
-stripNot{T<:Trait}(Tr::Type{T}) = Tr
-function stripNot{T<:Not}(Tr::Type{T})
-    Tr = T.parameters[1]
-    Tr<:Trait || error("`Not` cannot be used without a `Trait` as parameter")
-    return Tr<:Not ? Tr.parameters[1] : T
-end
+stripNot{T<:Trait}(::Type{T}) = T
+stripNot{T<:Trait}(::Type{Not{T}}) = Not{T}
+stripNot{T<:Trait}(::Type{Not{Not{T}}}) = stripNot(T)
 
 # Transforms a type encoding a trait into itself if the trait is
 # fulfilled, or into Not{itself}.  It is used to define whether a
 # trait is implemented for a set of types or not.  Trait-dispatch then
 # uses this.  Default for any type is that it is not fulfilled:
 trait{T<:Trait}(::Type{T}) = Not{T}
-function trait{T<:Not}(::Type{T})
-    # if it is a Not{...} then need to unravel it.
-    Tr = stripNot(T)
-    Tr = Tr<:Not ? Tr.parameters[1] : Tr # strip also last Not
-    return trait(Tr)==Tr ? Tr : Not{Tr}
-end
+trait{T<:Trait}(::Type{Not{T}}) = trait(T)
 
 ## Under the hood, a trait is then implemented for specific types by
 ## defining:
@@ -68,21 +61,21 @@ macro traitimpl(tr)
     # makes
     # trait{X1<:Int,X2<:Float64}(::Type{Tr1{X1,X2}}) = Tr1{X1,X2}
     typs = tr.args[2:end]
-    trname = tr.args[1]
+    trname = esc(tr.args[1])
     curly = Any[]
     paras = Any[]
     for (ty,v) in zip(typs, GenerateTypeVars{:upcase}())
-        push!(curly, Expr(:(<:), v, ty))  #:($v<:$ty)
-        push!(paras, v)
+        push!(curly, Expr(:(<:), esc(v), esc(ty)))  #:($v<:$ty)
+        push!(paras, esc(v))
     end
     arg = :(::Type{$trname{$(paras...)}})
-    fnhead = :(SimpleTraits.trait{$(curly...)}($arg))
-    isfnhead = :(SimpleTraits.istrait{$(curly...)}($arg))
-    esc(quote
+    fnhead = :($curmod.trait{$(curly...)}($arg))
+    isfnhead = :($curmod.istrait{$(curly...)}($arg))
+    quote
         $fnhead = $trname{$(paras...)}
         $isfnhead = true # Add the istrait definition as otherwise
                          # method-caching can be an issue.
-    end)
+    end
 end
 
 # Defining a function dispatching on the trait (or not)
@@ -117,7 +110,7 @@ function traitfn(tfn)
         fn = :($(Expr(:macrocall, mac, fn)))
     end
     quote
-        $fname{$(typs...)}($(args...)) = $fname(SimpleTraits.trait($trait), $(striparg(args)...))
+        $fname{$(typs...)}($(args...)) = (Base.@_inline_meta(); $fname(SimpleTraits.trait($trait), $(striparg(args)...)))
         $fn
     end
 end
