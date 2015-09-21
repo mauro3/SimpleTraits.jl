@@ -1,11 +1,11 @@
 using SimpleTraits.BaseTraits
 
 @test istrait(IsAnything{Any})
-@test istrait(IsAnything{None})
+@test istrait(IsAnything{Union{}})
 @test istrait(IsAnything{Int})
 
 @test !istrait(IsNothing{Any})
-@test !istrait(IsNothing{None})
+@test !istrait(IsNothing{Union{}})
 @test !istrait(IsNothing{Int})
 
 @test istrait(IsBits{Int})

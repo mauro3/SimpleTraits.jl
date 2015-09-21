@@ -96,7 +96,7 @@ function traitfn(tfn)
     fhead = tfn.args[1]
     fbody = tfn.args[2]
     fname = fhead.args[1].args[1]
-    args = fhead.args[2:end]
+    args = insertdummy(fhead.args[2:end])
     typs = fhead.args[1].args[3:end]
     trait = fhead.args[1].args[2].args[1]
     if isnegated(trait)
@@ -107,12 +107,12 @@ function traitfn(tfn)
     end
     if hasmac
         fn = :(@dummy $fname{$(typs...)}($val, $(args...)) = $fbody)
-        fn.args[1] = mac
+        fn.args[1] = mac # replace @dummy
     else
         fn = :($fname{$(typs...)}($val, $(args...)) = $fbody)
     end
     quote
-        $fname{$(typs...)}($(args...)) = (Base.@_inline_meta(); $fname($curmod.trait($trait), $(stripType(striparg(args))...)))
+        $fname{$(typs...)}($(args...)) = (Base.@_inline_meta(); $fname($curmod.trait($trait), $(striparg(args)...)))
         $fn
     end
 end
@@ -128,14 +128,14 @@ end
 isnegated(t::Expr) = t.head==:call
 
 # [:(x::X)] -> [:x]
-striparg(args::Vector) = [striparg(a) for a in args]
+striparg(args::Vector) = Any[striparg(a) for a in args]
 striparg(a::Symbol) = a
 striparg(a::Expr) = a.args[1]
 
-# :(Type{X}) -> X, X->X
-stripType(args::Vector) = [stripType(a) for a in args]
-stripType(a::Symbol) = a
-stripType(a::Expr) = (a.head==:curly && a.args[1]==:Type) ? a.args[2] : a
+# insert dummy: ::X -> gensym()::X
+insertdummy(args::Vector) = Any[insertdummy(a) for a in args]
+insertdummy(a::Symbol) = a
+insertdummy(a::Expr) = (a.head==:(::) && length(a.args)==1) ? Expr(:(::), gensym(), a.args[1]) : a
 
 # generates: X1, X2,... or x1, x2.... (just symbols not actual TypeVar)
 type GenerateTypeVars{CASE}
