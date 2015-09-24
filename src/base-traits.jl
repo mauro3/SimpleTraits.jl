@@ -1,38 +1,43 @@
 module BaseTraits
 using SimpleTraits
 
-export IsBits, IsImmutable, IsContiguous, IsFastLinearIndex, IsAnything, IsNothing, IsCallable
+export IsLeafType, IsBits, IsImmutable, IsContiguous, IsFastLinearIndex,
+       IsAnything, IsNothing, IsCallable
 
-@traitdef IsBits{X}
-@traitdef IsImmutable{X}
-@traitdef IsCallable{X}
-
-# TODO
-## @traitdef IsArray{X} # use for any array like type in the sense of container
-##                   # types<:AbstractArray are automatically part
-
-## @traitdef IsMartix{X} # use for any LinearOperator
-##                    # types<:AbstractArray are automatically part
-
-# Trait which contains all types
+"Trait which contains all types"
 @traitdef IsAnything{X}
 SimpleTraits.trait{X}(::Type{IsAnything{X}}) = IsAnything{X}
-# Trait which contains no types
+
+"Trait which contains no types"
 typealias IsNothing{X} Not{IsAnything{X}}
 
-@traitdef IsContiguous{X} # https://github.com/JuliaLang/julia/issues/10889
-@traitdef IsFastLinearIndex{X} # https://github.com/JuliaLang/julia/pull/8432
-    
+
+"Trait of all isbits-types"
+@traitdef IsBits{X}
 @generated SimpleTraits.trait{X}(::Type{IsBits{X}}) =
     isbits(X) ? :(IsBits{X}) : :(Not{IsBits{X}})
 
+"Trait of all immutable types"
+@traitdef IsImmutable{X}
 @generated SimpleTraits.trait{X}(::Type{IsImmutable{X}}) =
     X.mutable ? :(Not{IsImmutable{X}}) : :(IsImmutable{X})
 
+"Trait of all callable objects"
+@traitdef IsCallable{X}
+@generated SimpleTraits.trait{X}(::Type{IsCallable{X}}) =
+    (X==Function ||  length(methods(call, (X,Vararg)))>0) ? IsCallable{X} : Not{IsCallable{X}}
+
+"Trait of all leaf types types"
+@traitdef IsLeafType{X}
+@generated trait{X}(::Type{IsLeafType{X}}) = X.mutable ? :(Not{IsLeafType{X}}) : :(IsLeafType{X})
+
+"Types which have contiguous memory layout"
+@traitdef IsContiguous{X} # https://github.com/JuliaLang/julia/issues/10889
 @generated SimpleTraits.trait{X}(::Type{IsContiguous{X}}) =
     Base.iscontiguous(X) ? :(IsContiguous{X}) : :(Not{IsContiguous{X}})
 
-
+"Array indexing trait."
+@traitdef IsFastLinearIndex{X} # https://github.com/JuliaLang/julia/pull/8432
 @generated function SimpleTraits.trait{X}(::Type{IsFastLinearIndex{X}})
     if Base.linearindexing(X)==Base.LinearFast()
         return :(IsFastLinearIndex{X})
@@ -43,12 +48,11 @@ typealias IsNothing{X} Not{IsAnything{X}}
     end
 end
 
-@generated function SimpleTraits.trait{X}(::Type{IsCallable{X}})
-    if X==Function ||  length(methods(call, (X,Vararg)))>0
-        return IsCallable{X}
-    else
-        return Not{IsCallable{X}}
-    end
-end
-    
+# TODO
+## @traitdef IsArray{X} # use for any array like type in the sense of container
+##                   # types<:AbstractArray are automatically part
+
+## @traitdef IsMartix{X} # use for any LinearOperator
+##                    # types<:AbstractArray are automatically part
+
 end # module

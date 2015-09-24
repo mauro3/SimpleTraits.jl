@@ -11,15 +11,19 @@ export Trait, istrait, @traitdef, @traitimpl, @traitfn, Not
 ## @doc """
 ## `abstract Trait{SUPER}`
 
-## All traits are subtypes of abstract type Trait.  (SUPER is not used
-## here but in Traits.jl)
+"""
+All Traits are subtypes of abstract type Trait.  (SUPER is not used
+here but in Traits.jl)
+"""
 abstract Trait{SUPER}
 # a concrete Trait will look like
 ## immutable Tr1{X,Y} <: Trait end
 # where X and Y are the types involved in the trait.
 
-# The set of all types not belonging to a trait is encoded by wrapping
-# it with Not{}, e.g.  Not{Tr1{X,Y}}
+"""
+The set of all types not belonging to a trait is encoded by wrapping
+it with Not{}, e.g.  Not{Tr1{X,Y}}
+"""
 abstract Not{T<:Trait} <: Trait
 
 # Helper to strip an even number of Not{}s off: Not{Not{T}}->T
@@ -27,10 +31,21 @@ stripNot{T<:Trait}(::Type{T}) = T
 stripNot{T<:Trait}(::Type{Not{T}}) = Not{T}
 stripNot{T<:Trait}(::Type{Not{Not{T}}}) = stripNot(T)
 
-# Transforms a type encoding a trait into itself if the trait is
-# fulfilled, or into Not{itself}.  It is used to define whether a
-# trait is implemented for a set of types or not.  Trait-dispatch then
-# uses this.  Default for any type is that it is not fulfilled:
+"""
+A trait is defined as full filled if this function is the identity function for that trait.
+Otherwise it returns the trait wrapped in `Not`.
+
+Example:
+```
+trait(IsBits{Int}) # returns IsBits{Int}
+trait(IsBits{Array}) # returns Not{IsBits{Array}}
+```
+
+Instead of using `@traitimpl` one can define a method for `trait` to
+implement a trait.  If this uses `@generated` functions it will be
+in-lined away.  For example the `IsBits` trait is defined by:
+```
+"""
 trait{T<:Trait}(::Type{T}) = Not{T}
 trait{T<:Trait}(::Type{Not{T}}) = trait(T)
 
@@ -43,20 +58,40 @@ trait{T<:Trait}(::Type{Not{T}}) = trait(T)
 # Note due to invariance, this does probably not the right thing:
 #   trait(::Type{Tr1{Integer,FloatingPoint}}) = Tr1{Integer, FloatingPoint}
 
-# Function istrait checks whether a trait is fulfilled by a specific
-# set of types (using the return of `trait`):
-## istrait(Tr1{Int,Float64}) => return true or false
+"""
+This function checks whether a trait is fulfilled by a specific
+set of types.
+```
+istrait(Tr1{Int,Float64}) => return true or false
+```
+"""
 istrait(::Any) = error("Argument is not a Trait.")
 istrait{T<:Trait}(tr::Type{T}) = trait(tr)==stripNot(tr) ? true : false # Problem, this can run into issue #265
                                                                         # thus is redefine when traits are defined
-# Defining a trait
-# @traitdef Tr1{X,Y}
+"""
+Used to define a trait.  Traits, like types, are camel cased.
+Often they start with `Is` or `Has`.
+
+Examples:
+```
+@traitdef IsFast{X}
+@traitdef IsSlow{X,Y}
+```
+"""
 macro traitdef(tr)
     :(immutable $(esc(tr)) <: Trait end)
 end
 
-# Adding types to a trait
-# @traitimpl Tr1{Int,Float64}
+"""
+Used to add a type or type-tuple to a trait.  By default a type does
+not belong to a trait.
+
+Example:
+```
+@traitdef IsFast{X}
+@traitimpl IsFast{Array{Int,1}}
+```
+"""
 macro traitimpl(tr)
     # makes
     # trait{X1<:Int,X2<:Float64}(::Type{Tr1{X1,X2}}) = Tr1{X1,X2}
@@ -116,6 +151,14 @@ function traitfn(tfn)
         $fn
     end
 end
+"""
+Defines a function dispatching on a trait:
+```
+@traitfn f{X,Y;  Tr1{X,Y}}(x::X,y::Y) = ...
+@traitfn f{X,Y; !Tr1{X,Y}}(x::X,y::Y) = ... # which is just sugar for:
+@traitfn f{X,Y; Not{Tr1{X,Y}}}(x::X,y::Y) = ...
+```
+"""
 macro traitfn(tfn)
     esc(traitfn(tfn))
 end
