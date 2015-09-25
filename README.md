@@ -7,8 +7,9 @@ Note that Julia 0.3 is only supported up to tag
 
 This attempts to reduce the complexity of
 [Traits.jl](https://github.com/mauro3/Traits.jl), but at the same time
-staying compatible.  On the upside, it also works for Julia-0.3.  It
-drops support for:
+staying compatible (but I think that is not possible currently).  On
+the upside, it also works for Julia-0.3 (up to tag v0.0.1).  It drops
+support for:
 
 - Trait definition in terms of methods and constraints.  Instead the
   user needs to assign types to traits manually.  This removes the
@@ -42,7 +43,8 @@ then add types to the traits with
 
 Functions which dispatch on traits are constructed like:
 ```julia
-@traitfn f{X; Tr1{X}}(x::X) = 1 
+@traitfn f{X;  Tr1{X}}(x::X) # initialize
+@traitfn f{X;  Tr1{X}}(x::X) = 1
 @traitfn f{X; !Tr1{X}}(x::X) = 2
 ```
 This means that a type `X` which is part of the trait `Tr1` will
@@ -54,6 +56,7 @@ dispatch to the method returning `1`, otherwise 2.
 
 Similarly for `Tr2`:
 ```julia
+@traitfn f{X,Y; Tr2{X,Y}}(x::X,y::Y,z)
 @traitfn f{X,Y; Tr2{X,Y}}(x::X,y::Y,z) = 1
 @test f(5, "b", "a")==1
 @test_throws MethodError f(5,5, "a")==2
@@ -63,13 +66,27 @@ Similarly for `Tr2`:
 
 Note that for one generic function, dispatch on traits can only work
 on one trait for a given signature.  Continuing above example, this
-does not work as one may expect:
+does not work:
 ```julia
 @traitfn f{X; !Tr2{X,X}}(x::X) = 10
 ```
-as this definition will just overwrite the definition `@traitfn f{X;
-Tr1{X}}(x::X) = 1` from above.  If you need to dispatch on several
-traits, then you need Traits.jl.
+and will result in a method which never gets called (without an error
+being thrown).
+
+*Dispatch on several traits*
+
+It is also possible to dispatch on several traits:
+
+```julia
+@traitfn f55{X, Y;  TT1{X},  TT2{Y}}(x::X, y::Y)
+@traitfn f55{X, Y;  TT1{X},  TT2{Y}}(x::X, y::Y) = 1
+@traitfn f55{X, Y; !TT1{X},  TT2{Y}}(x::X, y::Y) = 2
+@traitfn f55{X, Y;  TT1{X}, !TT2{Y}}(x::X, y::Y) = 3
+@traitfn f55{X, Y; !TT1{X}, !TT2{Y}}(x::X, y::Y) = 4
+```
+Note that all methods need to feature the same traits (possibly
+negated) in the same order.  Any method violating that will never be
+called (without an error being thrown).
 
 ## Advanced features
 
@@ -136,6 +153,14 @@ b2 = f(b)
 @assert b2==B(2)
 ```
 
+# TODO
+
+- [ ] catch more syntax errors
+- [ ] make a debug mode which catches when wrong trait-methods are
+  defined
+- [ ] implement trait-inheritance
+- [ ] implement default argument functions
+- [ ] implement keyword functions
 
 # References
 
@@ -151,3 +176,8 @@ b2 = f(b)
   ([Jutho's idea](https://github.com/JuliaLang/julia/issues/10889#issuecomment-94317470))?
   In particular could it be used in such a way that it is compatible
   with the multiple inheritance used in Traits.jl?
+  *Now with multi-traits functions this may not be necessary anymore:
+  the intersection of two traits can divide the types into four groups.*
+- could there be Vararg traits?  Generally yes as there are vararg
+  methods.  However, in the current system it is not that easy as
+  there are no Vararg types.  Maybe `Tr{Tuple{X,Y,...}}` could work.

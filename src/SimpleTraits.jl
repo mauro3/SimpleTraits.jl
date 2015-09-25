@@ -30,7 +30,16 @@ abstract Trait{SUPER<:Tuple}
 #     print(" (a Trait)\n")
 # end
 
-# Needs a better name:
+"""
+TraitIntersection is used when defining a trait-method like
+```
+@traitfn f55{X, Y;  TT1{X},  TT2{Y}}(x::X, y::Y)
+@traitfn f55{X, Y;  TT1{X},  TT2{Y}}(x::X, y::Y) = 1
+@traitfn f55{X, Y; !TT1{X},  TT2{Y}}(x::X, y::Y) = 2
+@traitfn f55{X, Y; !TT1{X}, !TT2{Y}}(x::X, y::Y) = 3
+```
+to encode the total trait `{TT1{X},  TT2{Y}}`.
+"""
 immutable TraitIntersection{S<:Tuple} <: Trait{S} end # https://github.com/JuliaLang/julia/issues/13297
 # function Base.show{T<:Tuple}(io::IO, ti::Type{TraitIntersection{T}})
 #     println(io, "TraitIntersection of:")
@@ -75,16 +84,30 @@ in-lined away.  For example the `IsBits` trait is defined by:
 """
 trait{T<:Trait}(::Type{T}) = Not{T}
 trait{T<:Trait}(::Type{Not{T}}) = trait(T)
-@generated function trait{TU<:Tuple}(::Type{TraitIntersection{TU}})
-    out = Any[]
-    for T in TU.parameters
-        if !(T<:Trait)
-            error("Need a tuple of traits")
+
+"""
+TraitIntersections use a generated method of the `trait` function to
+evaluate whether a trait is fulfilled or not.  If a new type is added
+to a trait it can mean that this generated function is out of sync.
+Use this macro to re-initialize it. (Triggers a warning)
+"""
+macro reset_trait_intersections()
+    out = esc(:out46785) # poor man's gensym
+    TU = esc(gensym())
+    quote
+    @generated function SimpleTraits.trait{$TU<:Tuple}(::Type{TraitIntersection{$TU}})
+        $out = Any[]
+        for T in $TU.parameters
+            if !(T<:Trait)
+                error("Need a tuple of traits")
+            end
+            push!($out, trait(T))
         end
-        push!(out, trait(T))
+        return :(SimpleTraits.TraitIntersection{Tuple{$(out46785...)}})
     end
-    return :(TraitIntersection{Tuple{$(out...)}})
+    end
 end
+@reset_trait_intersections # initialize it
 
 ## Under the hood, a trait is then implemented for specific types by
 ## defining:
@@ -120,10 +143,14 @@ macro traitdef(tr)
     if tr.head==:curly
         :(immutable $(esc(tr)) <: Trait end)
     elseif tr.head==:tuple
-        supert = Any[esc(tr.args[1].args[3]), map(esc, tr.args[2:end])...]
-        tr = tr.args[1].args[1]
-        :(immutable $(esc(tr)) <: Trait{Tuple{$(supert...)}} end)
-#        :(typealias $(esc(tr)) TraitIntersection{Tuple{$(supert...)}})
+        ## Error: (I)
+        return :(throw(TraitException("Sub-traiting is not supported")))
+        # supert = Any[esc(tr.args[1].args[3]), map(esc, tr.args[2:end])...]
+        # tr = tr.args[1].args[1]
+        ## Or proper supertrait  (II)
+        # :(immutable $(esc(tr)) <: Trait{Tuple{$(supert...)}} end)
+        ## Or alias  (III)
+        :(typealias $(esc(tr)) TraitIntersection{Tuple{$(supert...)}})
     else
         throw(TraitException(
         "Either define trait as `@traitdef Tr{...}` or as subtrait of at least two supertraits `@traitdef Tr{...} <: Tr1, Tr2`"))
@@ -177,53 +204,99 @@ function traitfn(tfn)
     else
         hasmac = false
     end
+    # see whether we're initializing the function or not:
+    if tfn.head==:call
+        init = true
+        # add a dummy body
+        tfn = :($tfn=begin 1 end)
+    elseif tfn.head==:function || tfn.head==:(=)
+        init = false
+    else
+        error("Not recognized: $tfn")
+    end
+
     fhead = tfn.args[1]
-    fbody = tfn.args[2]
     fname = fhead.args[1].args[1]
     args = insertdummy(fhead.args[2:end])
-    typs = fhead.args[1].args[3:end]
-    trait = fhead.args[1].args[2].args[1]
-    if isnegated(trait)
-        trait = trait.args[2]
-        val = :(::Type{$curmod.Not{$trait}})
-    else
-        val = :(::Type{$trait})
+    tpara = fhead.args[1].args[3:end]
+    # the trait dispatch wrapper
+    if isa(fhead.args[1].args[2], Symbol)
+        error("There are no trait-constraints, e.g. f{X; Tr{X}}(...)")
     end
-    if hasmac
-        fn = :(@dummy $fname{$(typs...)}($val, $(args...)) = $fbody)
-        fn.args[1] = mac # replace @dummy
-    else
-        fn = :($fname{$(typs...)}($val, $(args...)) = $fbody)
-    end
-    quote
-        $fname{$(typs...)}($(args...)) = (Base.@_inline_meta(); $fname($curmod.trait($trait), $(striparg(args)...)))
-        $fn
+    traits = fhead.args[1].args[2].args[1:end]
+    trait_args = [isnegated(t) ? :($curmod.Not{$(t.args[2])}) : t for t in traits]
+    trait_args = length(trait_args)==1 ? trait_args[1] : :($curmod.TraitIntersection{Tuple{$(trait_args...)}})
+    # TODO: add test to throw on @traitfn f56{X,Y; !(T4{X,Y}, T{X})}(x::X, y::Y)
+
+    trait_args_noNot = [isnegated(t) ? :($(t.args[2])) : t for t in traits]
+    trait_args_noNot = length(trait_args_noNot)==1 ? trait_args_noNot[1] : :($curmod.TraitIntersection{Tuple{$(trait_args_noNot...)}})
+    if init # the wrapper/trait-dispatch function:
+        return :($fname{$(tpara...)}($(args...)) = (Base.@_inline_meta(); $fname($curmod.trait($trait_args_noNot), $(strip_tpara(args)...))))
+        # TODO:
+        #  - return also logic functions returning a nice error
+
+    else # the logic:
+        fbody = tfn.args[2]
+        if hasmac
+            logic = :(@dummy $fname{$(tpara...)}(::Type{$trait_args}, $(args...)) = $fbody)
+            logic.args[1] = mac # replace @dummy
+        else
+            logic = :($fname{$(tpara...)}(::Type{$trait_args}, $(args...)) = $fbody)
+        end
+        # TODO:
+        # - could a error be thrown if a logic is added for a trait which is not wrapped?
+        return logic
     end
 end
 """
-Defines a function dispatching on a trait:
+Defines a function dispatching on a trait.
+
+First initialize it to let it know on which trait it dispatches
+```
+@traitfn f{X,Y;  Tr1{X,Y}}(x::X,y::Y)
+```
+then add trait methods:
 ```
 @traitfn f{X,Y;  Tr1{X,Y}}(x::X,y::Y) = ...
 @traitfn f{X,Y; !Tr1{X,Y}}(x::X,y::Y) = ... # which is just sugar for:
 @traitfn f{X,Y; Not{Tr1{X,Y}}}(x::X,y::Y) = ...
 ```
 
-CAUTION: trying to dispatch on several traits for just one method does
-not work but silently fails!  Example:
+CAUTION: trying to dispatch on trait not initialized will not work:
 ```
-@traitfn f{X;  Tr1{X}}(x::X) = ...
-@traitfn f{X;  Tr2{X}}(x::X) = ... # this completely shadows the first method
-                                   # (even though it still exists in the method table!)
-f{X}(x::X) = ... # this would also shadow either of above defs
+@traitfn f{X;  Tr2{X}}(x::X) = ... # this will never be called
 ```
+
 However, this is all fine:
 ```
-@traitfn f{X;   Tr1{X}}(x::X) = ...
-@traitfn f{X;  !Tr1{X}}(x::X) = ...    # ok, to do both the trait and its negation
-@traitfn f{X;   Tr2{X}}(x::X, y) = ... # ok, as method signature is different to above
-@traitfn f{X;  !Tr2{X}}(x::X, y) = ...
+@traitfn g{X;   Tr1{X}}(x::X)
+@traitfn g{X;   Tr1{X}}(x::X) = ...
+@traitfn g{X;  !Tr1{X}}(x::X) = ...    # ok, to do both the trait and its negation
+@traitfn g{X;   Tr2{X}}(x::X, y)       # ok, as method signature is different to above
+@traitfn g{X;   Tr2{X}}(x::X, y) = ...
+@traitfn g{X;  !Tr2{X}}(x::X, y) = ...
+```
+
+Note, when updating a method, then re-initialize the trait function as
+otherwise the old one is cached:
+```
+@traitfn g{X;   Tr1{X}}(x::X)
+@traitfn g{X;   Tr1{X}}(x::X) = new-logic
+```
+
+### Dispatching on several traits
+
+Is possible using this syntax:
+```
+@traitfn f55{X, Y;  TT1{X},  TT2{Y}}(x::X, y::Y)
+@traitfn f55{X, Y;  TT1{X},  TT2{Y}}(x::X, y::Y) = 1
+@traitfn f55{X, Y; !TT1{X},  TT2{Y}}(x::X, y::Y) = 2
+@traitfn f55{X, Y;  TT1{X}, !TT2{Y}}(x::X, y::Y) = 3
 
 ```
+Note that all methods need to feature the same traits (possibly
+negated) in the same order.  Any method violating that will never be
+called (and no error is thrown!).
 """
 macro traitfn(tfn)
     esc(traitfn(tfn))
@@ -233,13 +306,13 @@ end
 ## Helpers
 ######
 
-# true if :(!(Tr{x}))
-isnegated(t::Expr) = t.head==:call
+# true if :(!(...))
+isnegated(t::Expr) = t.head==:call  && t.args[1]==:!
 
 # [:(x::X)] -> [:x]
-striparg(args::Vector) = Any[striparg(a) for a in args]
-striparg(a::Symbol) = a
-striparg(a::Expr) = a.args[1]
+strip_tpara(args::Vector) = Any[strip_tpara(a) for a in args]
+strip_tpara(a::Symbol) = a
+strip_tpara(a::Expr) = a.args[1]
 
 # insert dummy: ::X -> gensym()::X
 insertdummy(args::Vector) = Any[insertdummy(a) for a in args]
