@@ -42,7 +42,7 @@ then add types to the traits with
 
 Functions which dispatch on traits are constructed like:
 ```julia
-@traitfn f{X; Tr1{X}}(x::X) = 1 
+@traitfn f{X; Tr1{X}}(x::X) = 1
 @traitfn f{X; !Tr1{X}}(x::X) = 2
 ```
 This means that a type `X` which is part of the trait `Tr1` will

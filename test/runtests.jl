@@ -68,9 +68,17 @@ trait = SimpleTraits.trait
 @test f(5.)==10
 
 # VarArg
-@traitfn g{X; Tr1{X}}(x::X, y...) = y
-@test g(5, 7, 8)==((7,8),)
-# @test g(5.0, 7, 8)==((7,8),) # hangs because of https://github.com/JuliaLang/julia/issues/13183
+@traitfn vara{X; Tr1{X}}(x::X, y...) = y
+@test vara(5, 7, 8)==(7,8)
+# @test vara(5.0, 7, 8)==((7,8),) # hangs in lowering because of https://github.com/JuliaLang/julia/issues/13183
+@traitfn vara2{X; Tr1{X}}(x::X...) = x
+@test vara2(5, 7, 8)==(5, 7, 8)
+@test_throws MethodError vara2(5, 7, 8.0)
+
+@traitfn vara3{X; Tr1{X}}(::X...) = X
+@test vara3(5, 7, 8)==Int
+@test_throws MethodError vara3(5, 7, 8.0)
+
 
 # with macro
 @traitfn @inbounds gg{X; Tr1{X}}(x::X) = x
