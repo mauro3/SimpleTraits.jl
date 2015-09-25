@@ -4,36 +4,60 @@ const curmod = module_name(current_module())
 # This is basically just adding a few convenience functions & macros
 # around Holy Traits.
 
-export Trait, istrait, @traitdef, @traitimpl, @traitfn, Not
+export Trait, istrait, @traitdef, @traitimpl, @traitfn, Not,
+       IsAnything, IsNothing
 
-# All traits are concrete subtypes of this trait.  SUPER is not used
+# General trait exception
+type TraitException <: Exception
+    msg::AbstractString
+end
+
+
+# All traits are subtypes of this trait.  SUPER is not used
 # but present to be compatible with Traits.jl.
 ## @doc """
 ## `abstract Trait{SUPER}`
-
 """
-All Traits are subtypes of abstract type Trait.  (SUPER is not used
-here but in Traits.jl)
+All Traits are subtypes of abstract type Trait or a Tuple of Traits.
+(SUPER is not used here but in Traits.jl)
 """
-abstract Trait{SUPER}
+abstract Trait{SUPER<:Tuple}
 # a concrete Trait will look like
 ## immutable Tr1{X,Y} <: Trait end
 # where X and Y are the types involved in the trait.
+# function Base.show{T<:Trait}(io::IO, Tr::Type{T})
+#     invoke(show, Tuple{IO, DataType}, io, Tr)
+#     print(" (a Trait)\n")
+# end
+
+# Needs a better name:
+immutable TraitIntersection{S<:Tuple} <: Trait{S} end # https://github.com/JuliaLang/julia/issues/13297
+# function Base.show{T<:Tuple}(io::IO, ti::Type{TraitIntersection{T}})
+#     println(io, "TraitIntersection of:")
+#     for Tr in T.parameters
+#         print(io, " ")
+#         if Tr<:TraitIntersection
+#             show(io, Tr)
+#         else
+#             invoke(show, Tuple{IO, DataType}, io, Tr)
+#         end
+#         print(io, "\n")
+#     end
+# end
 
 """
 The set of all types not belonging to a trait is encoded by wrapping
 it with Not{}, e.g.  Not{Tr1{X,Y}}
 """
-abstract Not{T<:Trait} <: Trait
-
+immutable Not{T<:Trait} <: Trait end
 # Helper to strip an even number of Not{}s off: Not{Not{T}}->T
 stripNot{T<:Trait}(::Type{T}) = T
 stripNot{T<:Trait}(::Type{Not{T}}) = Not{T}
 stripNot{T<:Trait}(::Type{Not{Not{T}}}) = stripNot(T)
 
 """
-A trait is defined as full filled if this function is the identity function for that trait.
-Otherwise it returns the trait wrapped in `Not`.
+A trait is defined as full filled if this function is the identity
+function for that trait. Otherwise it returns the trait wrapped in `Not`.
 
 Example:
 ```
@@ -45,9 +69,22 @@ Instead of using `@traitimpl` one can define a method for `trait` to
 implement a trait.  If this uses `@generated` functions it will be
 in-lined away.  For example the `IsBits` trait is defined by:
 ```
+@traitdef IsBits{X}
+@generated trait{X}(::Type{IsBits{X}}) = isbits(X) ? :(IsBits{X}) : :(Not{IsBits{X}})
+```
 """
 trait{T<:Trait}(::Type{T}) = Not{T}
 trait{T<:Trait}(::Type{Not{T}}) = trait(T)
+@generated function trait{TU<:Tuple}(::Type{TraitIntersection{TU}})
+    out = Any[]
+    for T in TU.parameters
+        if !(T<:Trait)
+            error("Need a tuple of traits")
+        end
+        push!(out, trait(T))
+    end
+    return :(TraitIntersection{Tuple{$(out...)}})
+end
 
 ## Under the hood, a trait is then implemented for specific types by
 ## defining:
@@ -67,7 +104,8 @@ istrait(Tr1{Int,Float64}) => return true or false
 """
 istrait(::Any) = error("Argument is not a Trait.")
 istrait{T<:Trait}(tr::Type{T}) = trait(tr)==stripNot(tr) ? true : false # Problem, this can run into issue #265
-                                                                        # thus is redefine when traits are defined
+                                                                        # thus it is redefine when traits are defined
+
 """
 Used to define a trait.  Traits, like types, are camel cased.
 Often they start with `Is` or `Has`.
@@ -79,7 +117,17 @@ Examples:
 ```
 """
 macro traitdef(tr)
-    :(immutable $(esc(tr)) <: Trait end)
+    if tr.head==:curly
+        :(immutable $(esc(tr)) <: Trait end)
+    elseif tr.head==:tuple
+        supert = Any[esc(tr.args[1].args[3]), map(esc, tr.args[2:end])...]
+        tr = tr.args[1].args[1]
+        :(immutable $(esc(tr)) <: Trait{Tuple{$(supert...)}} end)
+#        :(typealias $(esc(tr)) TraitIntersection{Tuple{$(supert...)}})
+    else
+        throw(TraitException(
+        "Either define trait as `@traitdef Tr{...}` or as subtrait of at least two supertraits `@traitdef Tr{...} <: Tr1, Tr2`"))
+    end
 end
 
 """
@@ -107,6 +155,7 @@ macro traitimpl(tr)
     fnhead = :($curmod.trait{$(curly...)}($arg))
     isfnhead = :($curmod.istrait{$(curly...)}($arg))
     quote
+        $trname <: TraitIntersection && error("Cannot use @traitimpl with TraitIntersection: implement each super-trait by hand.")
         $fnhead = $trname{$(paras...)}
         $isfnhead = true # Add the istrait definition as otherwise
                          # method-caching can be an issue.
@@ -158,6 +207,23 @@ Defines a function dispatching on a trait:
 @traitfn f{X,Y; !Tr1{X,Y}}(x::X,y::Y) = ... # which is just sugar for:
 @traitfn f{X,Y; Not{Tr1{X,Y}}}(x::X,y::Y) = ...
 ```
+
+CAUTION: trying to dispatch on several traits for just one method does
+not work but silently fails!  Example:
+```
+@traitfn f{X;  Tr1{X}}(x::X) = ...
+@traitfn f{X;  Tr2{X}}(x::X) = ... # this completely shadows the first method
+                                   # (even though it still exists in the method table!)
+f{X}(x::X) = ... # this would also shadow either of above defs
+```
+However, this is all fine:
+```
+@traitfn f{X;   Tr1{X}}(x::X) = ...
+@traitfn f{X;  !Tr1{X}}(x::X) = ...    # ok, to do both the trait and its negation
+@traitfn f{X;   Tr2{X}}(x::X, y) = ... # ok, as method signature is different to above
+@traitfn f{X;  !Tr2{X}}(x::X, y) = ...
+
+```
 """
 macro traitfn(tfn)
     esc(traitfn(tfn))
@@ -191,6 +257,13 @@ Base.done(::GenerateTypeVars, state) = false
 ####
 # Extras
 ####
+
+"Trait which contains all types"
+@traitdef IsAnything{X}
+@traitimpl IsAnything{Any}
+"Trait which contains no types"
+typealias IsNothing{X} Not{IsAnything{X}}
+# TODO what about IsAnything{X,Y} ?
 
 include("base-traits.jl")
 

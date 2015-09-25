@@ -1,16 +1,7 @@
 module BaseTraits
 using SimpleTraits
 
-export IsLeafType, IsBits, IsImmutable, IsContiguous, IsFastLinearIndex,
-       IsAnything, IsNothing, IsCallable
-
-"Trait which contains all types"
-@traitdef IsAnything{X}
-SimpleTraits.trait{X}(::Type{IsAnything{X}}) = IsAnything{X}
-
-"Trait which contains no types"
-typealias IsNothing{X} Not{IsAnything{X}}
-
+export IsLeafType, IsBits, IsImmutable, IsContiguous, IsFastLinearIndex, IsCallable
 
 "Trait of all isbits-types"
 @traitdef IsBits{X}

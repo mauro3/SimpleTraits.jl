@@ -2,6 +2,10 @@ using SimpleTraits
 using Base.Test
 
 trait = SimpleTraits.trait
+Inter = SimpleTraits.TraitIntersection
+
+immutable A end
+immutable B end
 
 # @test_throws MethodError trait(4)
 @test_throws ErrorException istrait(4)
@@ -88,6 +92,54 @@ trait = SimpleTraits.trait
 @traitfn gg27{X; Tr1{X}}(::X) = X
 @test gg27([1])==Array{Int,1}
 
+
+# Tuple traits
+# typealias STr3{X,Y} Inter{Tuple{Tr1{X}, Tr2{X,Y}}}
+# @test istrait(STr3{Int,Float64})
+# @traitfn f54{X, Y;  STr3{X,Y}}(x::X, y::Y) = 1
+# @traitfn f54{X, Y; !STr3{X,Y}}(x::X, y::Y) = 2
+# @test f54(4,5.0)==1
+# @test f54("asdf","asdf")==2
+
+# @test_throws ErrorException @traitimpl STr3{A, Float64}
+# @traitimpl Tr1{A}
+# @traitimpl Tr2{A, Float64}
+# @test f54(A(),5.0)==1
+
+# # nested subtraits
+# @traitdef Tr3{X}
+# @traitimpl Tr3{A}
+# typealias STr4{X,Y} Inter{Tuple{STr3{X,Y}, Tr3{X}}}
+# @test istrait(STr4{A, Float64})
+# @test !istrait(STr4{Float64, A})
+# # use traitdef syntax:
+# @traitdef STr44{X,Y} <: STr3{X,Y}, Tr3{X}
+# @test STr44===STr4
+# @test STr44{A,Int}===STr4{A,Int}
+
+## several traits
+@traitdef TT1{X}
+@traitimpl TT1{A}
+@traitdef TT2{Y}
+@traitimpl TT2{B}
+# this gives combinations:
+@test trait(Inter{Tuple{TT1{A},TT2{B}}})==Inter{Tuple{    TT1{A} ,     TT2{B} }}
+@test trait(Inter{Tuple{TT1{A},TT2{A}}})==Inter{Tuple{    TT1{A} , Not{TT2{A} }}}
+@test trait(Inter{Tuple{TT1{B},TT2{B}}})==Inter{Tuple{Not{TT1{B}},     TT2{B} }}
+@test trait(Inter{Tuple{TT1{B},TT2{A}}})==Inter{Tuple{Not{TT1{B}}, Not{TT2{A} }}}
+
+
+
+
+# @traitfn f55{X, Y;  TT1{X},  TT2{Y}}(x::X, y::Y) = 1
+# @traitfn f55{X, Y; !TT1{X},  TT2{Y}}(x::X, y::Y) = 2
+# @traitfn f55{X, Y; !TT1{X}, !TT2{Y}}(x::X, y::Y) = 3
+# @traitfn f55{X, Y;  TT1{X}, !TT2{Y}}(x::X, y::Y) = 4
+
+# @test f55(A(),B())==1
+# @test f55(B(),B())==2
+# @test f55(B(),A())==3
+# @test f55(A(),A())==4
 
 ######
 # Other tests
