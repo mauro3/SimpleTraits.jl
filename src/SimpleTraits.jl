@@ -171,6 +171,7 @@ end
 isnegated(t::Expr) = t.head==:call
 
 # [:(x::X)] -> [:x]
+# also takes care of :...
 strip_tpara(args::Vector) = Any[strip_tpara(a) for a in args]
 strip_tpara(a::Symbol) = a
 function strip_tpara(a::Expr)
@@ -184,22 +185,17 @@ function strip_tpara(a::Expr)
 end
 
 # insert dummy: ::X -> gensym()::X
-# also takes care of ...
+# also takes care of :...
 insertdummy(args::Vector) = Any[insertdummy(a) for a in args]
 insertdummy(a::Symbol) = a
 function insertdummy(a::Expr)
-    if a.head==:...
-        dotdot = true
-        a = a.args[1]
+    if a.head==:(::) && length(a.args)==1
+        return Expr(:(::), gensym(), a.args[1])
+    elseif a.head==:...
+        return Expr(:..., insertdummy(a.args[1]))
     else
-        dotdot = false
+        return a
     end
-    if !isa(a, Symbol) && a.head==:(::) && length(a.args)==1
-        out = Expr(:(::), gensym(), a.args[1])
-    else
-        out = a
-    end
-    dotdot ? Expr(:..., out) : out
 end
 
 # generates: X1, X2,... or x1, x2.... (just symbols not actual TypeVar)
