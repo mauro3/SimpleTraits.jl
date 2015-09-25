@@ -178,6 +178,3 @@ b2 = f(b)
   with the multiple inheritance used in Traits.jl?
   *Now with multi-traits functions this may not be necessary anymore:
   the intersection of two traits can divide the types into four groups.*
-- could there be Vararg traits?  Generally yes as there are vararg
-  methods.  However, in the current system it is not that easy as
-  there are no Vararg types.  Maybe `Tr{Tuple{X,Y,...}}` could work.

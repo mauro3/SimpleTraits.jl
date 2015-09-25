@@ -82,10 +82,20 @@ immutable B end
 @test f(5.)==10
 
 # VarArg
-@traitfn g{X; Tr1{X}}(x::X, y...)
-@traitfn g{X; Tr1{X}}(x::X, y...) = y
-@test g(5, 7, 8)==((7,8),)
-# @test g(5.0, 7, 8)==((7,8),) # hangs because of https://github.com/JuliaLang/julia/issues/13183
+@traitfn vara{X; Tr1{X}}(x::X, y...)
+@traitfn vara{X; Tr1{X}}(x::X, y...) = y
+@test vara(5, 7, 8)==(7,8)
+# @test vara(5.0, 7, 8)==((7,8),) # hangs in lowering because of https://github.com/JuliaLang/julia/issues/13183
+@traitfn vara2{X; Tr1{X}}(x::X...)
+@traitfn vara2{X; Tr1{X}}(x::X...) = x
+@test vara2(5, 7, 8)==(5, 7, 8)
+@test_throws MethodError vara2(5, 7, 8.0)
+
+@traitfn vara3{X; Tr1{X}}(::X...)
+@traitfn vara3{X; Tr1{X}}(::X...) = X
+@test vara3(5, 7, 8)==Int
+@test_throws MethodError vara3(5, 7, 8.0)
+
 
 # with macro
 @traitfn @inbounds gg{X; Tr1{X}}(x::X)
@@ -173,6 +183,10 @@ println("-- endof ok warning.")
 # @test f56(B(),B())==2  # this does not work because Not{ST4}!={!TT1{X},  TT2{Y}}
 # @test f56(B(),A())==3
 # --> needs to be implemented with method II in traitdef.  Method III does not work!
+
+## Default arguments
+
+## Keyword
 
 ######
 # Other tests
