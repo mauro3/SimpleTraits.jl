@@ -3,7 +3,8 @@ using Base.Test
 
 ST = SimpleTraits
 trait = ST.trait
-Inter = ST.TraitIntersection
+Collection = ST.Collection
+Intersection = ST.Intersection
 
 immutable A end
 immutable B end
@@ -118,29 +119,23 @@ immutable B end
 @test gg27([1])==Array{Int,1}
 
 
-# # Tuple traits
-# typealias STr3{X,Y} Inter{Tuple{Tr1{X}, Tr2{X,Y}}}
-# @test istrait(STr3{Int,Float64})
-# @traitfn f54{X, Y;  STr3{X,Y}}(x::X, y::Y) = 1
-# @traitfn f54{X, Y; !STr3{X,Y}}(x::X, y::Y) = 2
-# @test f54(4,5.0)==1
-# @test f54("asdf","asdf")==2
-
-# @test_throws ErrorException @traitimpl STr3{A, Float64}
-# @traitimpl Tr1{A}
-# @traitimpl Tr2{A, Float64}
-# @test f54(A(),5.0)==1
-
-## Trait intersections
+## Trait intersections and collections
 @traitdef  TT1{X}
 @traitimpl TT1{A}
 @traitdef  TT2{Y}
 @traitimpl TT2{B}
-# this gives combinations:
-@test trait(Inter{Tuple{TT1{A},TT2{B}}})==Inter{Tuple{    TT1{A} ,     TT2{B} }}
-@test trait(Inter{Tuple{TT1{A},TT2{A}}})==Inter{Tuple{    TT1{A} , Not{TT2{A} }}}
-@test trait(Inter{Tuple{TT1{B},TT2{B}}})==Inter{Tuple{Not{TT1{B}},     TT2{B} }}
-@test trait(Inter{Tuple{TT1{B},TT2{A}}})==Inter{Tuple{Not{TT1{B}}, Not{TT2{A} }}}
+
+# intersections
+@test trait(Intersection{Tuple{TT1{A},TT2{B}}})==Intersection{Tuple{TT1{A}, TT2{B}}}
+@test trait(Intersection{Tuple{TT1{A},TT2{A}}})==Not{Intersection{Tuple{TT1{A}, TT2{A}}}}
+@test trait(Intersection{Tuple{TT1{B},TT2{B}}})==Not{Intersection{Tuple{TT1{B}, TT2{B}}}}
+@test trait(Intersection{Tuple{TT1{B},TT2{A}}})==Not{Intersection{Tuple{TT1{B}, TT2{A}}}}
+
+# this gives collection combinations:
+@test trait(Collection{TT1{A},TT2{B}})==Collection{    TT1{A} ,     TT2{B} }
+@test trait(Collection{TT1{A},TT2{A}})==Collection{    TT1{A} , Not{TT2{A} }}
+@test trait(Collection{TT1{B},TT2{B}})==Collection{Not{TT1{B}},     TT2{B} }
+@test trait(Collection{TT1{B},TT2{A}})==Collection{Not{TT1{B}}, Not{TT2{A} }}
 
 @traitfn f55{X, Y;  TT1{X},  TT2{Y}}(x::X, y::Y)
 @traitfn f55{X, Y;  TT1{X},  TT2{Y}}(x::X, y::Y) = 1
@@ -158,31 +153,38 @@ immutable B end
 
 # this fails because the generated-function has already been created above:
 @traitimpl TT2{A}
-@test !(trait(Inter{Tuple{TT1{A},TT2{A}}})==Inter{Tuple{    TT1{A} , TT2{A} }})
+@test !(trait(Collection{TT1{A},TT2{A}})==Collection{    TT1{A} , TT2{A} })
 println("-- This warning is ok:")
-ST.@reset_trait_intersections
+ST.@reset_trait_collections
 println("-- endof ok warning.")
-@test trait(Inter{Tuple{TT1{A},TT2{A}}})==Inter{Tuple{    TT1{A} , TT2{A} }}
+@test trait(Collection{TT1{A},TT2{A}})==Collection{   TT1{A} , TT2{A} }
 
-@traitfn f55{X, Y;  TT1{X},  TT2{Y}}(x::X, y::Y)
+@traitfn f55{X, Y;  TT1{X},  TT2{Y}}(x::X, y::Y) # clear cached
+@traitfn f55{X, Y;  TT1{X},  TT2{Y}}(x::X, y::Y) = 1
+@traitfn f55{X, Y; TT1{X}, !TT2{Y}}(x::X, y::Y) = 4
 @test f55(A(),A())==1
 
-# # Subtraits
-@test_throws ST.TraitException @traitdef TT4{X,Y} <: Tr2{X,Y}, Tr1{X} #  are not allowed
-# @traitdef ST4{X,Y} <: TT1{X}, TT2{Y}  # just an alias for the Intersection
-# X,Y = TypeVar(:XX, true), TypeVar(:YY,true)
-# @test ST4{X,Y}===Inter{Tuple{TT1{X}, TT2{Y}}}
-# @test !(ST4{X,Y}===Inter{Tuple{TT1{Y}, TT2{X}}})
+# Intersections
+typealias SI4{X,Y} Intersection{Tuple{TT1{X}, TT2{Y}}}  # just an alias for the Collectionsection
+X,Y = TypeVar(:XX, true), TypeVar(:YY,true)
+@test SI4{X,Y}===Intersection{Tuple{TT1{X}, TT2{Y}}}
+@test trait(SI4{A,B})===SI4{A,B}
+@test trait(SI4{B,B})===Not{SI4{B,B}}
 
-# @traitfn f56{X,Y;  ST4{X,Y}}(x::X, y::Y) # note that ST4 is similar to {TT1{X},  TT2{Y}}
-# @traitfn f56{X,Y;  ST4{X,Y}}(x::X, y::Y) = 1
-# @traitfn f56{X,Y; !ST4{X,Y}}(x::X, y::Y) = 2
+@traitfn f56{X,Y;  SI4{X,Y}}(x::X, y::Y) # note that SI4 is similar to {TT1{X},  TT2{Y}}
+@traitfn f56{X,Y;  SI4{X,Y}}(x::X, y::Y) = 1
+@traitfn f56{X,Y; !SI4{X,Y}}(x::X, y::Y) = 2
 
-# @test f56(A(),B())==1
-# @test f56(A(),A())==1
-# @test f56(B(),B())==2  # this does not work because Not{ST4}!={!TT1{X},  TT2{Y}}
-# @test f56(B(),A())==3
-# --> needs to be implemented with method II in traitdef.  Method III does not work!
+@test f56(A(),B())==1
+@test f56(A(),A())==1
+@test f56(B(),B())==2
+@test f56(B(),A())==2
+
+# Subtraits
+@traitdef ST4{X,Y} <: TT1{X}, TT2{Y}  # just an alias for the Collectionsection
+X,Y = TypeVar(:XX, true), TypeVar(:YY,true)
+@test super(ST4{X,Y}).parameters[1]===Intersection{Tuple{TT1{X}, TT2{Y}}}
+
 
 ## Default arguments
 

@@ -178,3 +178,7 @@ b2 = f(b)
   with the multiple inheritance used in Traits.jl?
   *Now with multi-traits functions this may not be necessary anymore:
   the intersection of two traits can divide the types into four groups.*
+- For trait Collections, Intersections, and TUnion, should a Union be
+  used for the underlying storage as that sorts and purges its inputs?
+  This would rely on un-supported Union behaviour, however it might be
+  quite nice.

@@ -19,39 +19,15 @@ end
 ## `abstract Trait{SUPER}`
 """
 All Traits are subtypes of abstract type Trait or a Tuple of Traits.
-(SUPER is not used here but in Traits.jl)
+SUPER contains the Intersection of its super traits.
 """
-abstract Trait{SUPER<:Tuple}
+abstract Trait{SUPER} # SUPER<:Intersection but that is not possible
 # a concrete Trait will look like
 ## immutable Tr1{X,Y} <: Trait end
 # where X and Y are the types involved in the trait.
 # function Base.show{T<:Trait}(io::IO, Tr::Type{T})
 #     invoke(show, Tuple{IO, DataType}, io, Tr)
 #     print(" (a Trait)\n")
-# end
-
-"""
-TraitIntersection is used when defining a trait-method like
-```
-@traitfn f55{X, Y;  TT1{X},  TT2{Y}}(x::X, y::Y)
-@traitfn f55{X, Y;  TT1{X},  TT2{Y}}(x::X, y::Y) = 1
-@traitfn f55{X, Y; !TT1{X},  TT2{Y}}(x::X, y::Y) = 2
-@traitfn f55{X, Y; !TT1{X}, !TT2{Y}}(x::X, y::Y) = 3
-```
-to encode the total trait `{TT1{X},  TT2{Y}}`.
-"""
-immutable TraitIntersection{S<:Tuple} <: Trait{S} end # https://github.com/JuliaLang/julia/issues/13297
-# function Base.show{T<:Tuple}(io::IO, ti::Type{TraitIntersection{T}})
-#     println(io, "TraitIntersection of:")
-#     for Tr in T.parameters
-#         print(io, " ")
-#         if Tr<:TraitIntersection
-#             show(io, Tr)
-#         else
-#             invoke(show, Tuple{IO, DataType}, io, Tr)
-#         end
-#         print(io, "\n")
-#     end
 # end
 
 """
@@ -63,6 +39,62 @@ immutable Not{T<:Trait} <: Trait end
 stripNot{T<:Trait}(::Type{T}) = T
 stripNot{T<:Trait}(::Type{Not{T}}) = Not{T}
 stripNot{T<:Trait}(::Type{Not{Not{T}}}) = stripNot(T)
+
+"""
+Collection of traits is used internally when defining a trait-method
+like so
+```
+@traitfn f55{X, Y;  TT1{X},  TT2{Y}}(x::X, y::Y)
+@traitfn f55{X, Y;  TT1{X},  TT2{Y}}(x::X, y::Y) = 1
+@traitfn f55{X, Y; !TT1{X},  TT2{Y}}(x::X, y::Y) = 2
+@traitfn f55{X, Y; !TT1{X}, !TT2{Y}}(x::X, y::Y) = 3
+```
+
+It encodes the collection of traits `((TT1{X}, TT2{Y}),(!TT1{X},
+TT2{Y}),(TT1{X}, !TT2{Y}),(!TT1{X}, !TT2{Y}))`.  Therefore, it is not
+a single trait but kind of several traits.  This is just used inside
+trait-functions and should not be used otherwise.
+
+(It is just a typealias to a Tuple.)
+"""
+typealias Collection Tuple
+# TODO: should `typealias Collection Union` ?
+#immutable Collection{S<:Tuple} end
+
+# function Base.show{T<:Tuple}(io::IO, ti::Type{Collection{T}})
+#     println(io, "Collection of:")
+#     for Tr in T.parameters
+#         print(io, " ")
+#         if Tr<:Collection
+#             show(io, Tr)
+#         else
+#             invoke(show, Tuple{IO, DataType}, io, Tr)
+#         end
+#         print(io, "\n")
+#     end
+# end
+
+
+"""
+Constructs the intersection of several traits.  A type(-tuple) belongs
+to a intersection if all its traits are fulfilled.
+"""
+immutable Intersection{S<:Tuple} <: Trait end
+# TODO: should S<:Union?
+
+# """
+# A new trait can be created from the union of several other
+# (sub-)traits.  A type(-tuple) belongs to this trait if at least one of its
+# sub-traits are fulfilled.
+
+# TODO: maybe implement this?
+# """
+# Constructs the union of several traits.  A type(-tuple) belongs
+# to a union if at least one of its traits is fulfilled.
+# """
+# immutable TUnion{S<:Tuple} <: Trait end
+
+
 
 """
 A trait is defined as full filled if this function is the identity
@@ -86,28 +118,68 @@ trait{T<:Trait}(::Type{T}) = Not{T}
 trait{T<:Trait}(::Type{Not{T}}) = trait(T)
 
 """
-TraitIntersections use a generated method of the `trait` function to
+Collections use a generated method of the `trait` function to
 evaluate whether a trait is fulfilled or not.  If a new type is added
 to a trait it can mean that this generated function is out of sync.
 Use this macro to re-initialize it. (Triggers a warning)
 """
-macro reset_trait_intersections()
+macro reset_trait_collections()
+    # TODO:
+    # - make specific to one trait-collection/trait-function
+    # - is it possible to make this cleaner?
     out = esc(:out46785) # poor man's gensym
-    TU = esc(gensym())
+#    TT = esc(:TT73840)
+    TT = esc(gensym())
     quote
-    @generated function SimpleTraits.trait{$TU<:Tuple}(::Type{TraitIntersection{$TU}})
-        $out = Any[]
-        for T in $TU.parameters
-            if !(T<:Trait)
-                error("Need a tuple of traits")
+        @generated function SimpleTraits.trait{$TT<:Collection}(::Type{$TT})
+            $out = Any[]
+            for T in $TT.parameters
+                if !(T<:Trait)
+                    error("Need a tuple of traits")
+                end
+                push!($out, trait(T))
             end
-            push!($out, trait(T))
+            return :(Collection{$(out46785...)})
         end
-        return :(SimpleTraits.TraitIntersection{Tuple{$(out46785...)}})
-    end
+        # @generated function SimpleTraits.trait{$TT<:Collection}(::Type{Intersection{$TT}}) # this fn relies on <:Collection
+        #     if trait($TT)===$TT
+        #         return :(Intersection{$TT73840})
+        #     else
+        #         return :(Not{Intersection{$TT73840}})
+        #     end
+        # end
+
+        # @generated function SimpleTraits.trait{$TT<:Tuple}(::Type{SimpleTraits.Not{Collection{$TT}}})
+        #     $out = Any[]
+        #     for T in $TT.parameters
+        #         if !(T<:Trait)
+        #             error("Need a tuple of traits")
+        #         end
+        #         push!($out, trait(T))
+        #     end
+        #     return :(SimpleTraits.Collection{Tuple{$(out46785...)}})
+        # end
     end
 end
-@reset_trait_intersections # initialize it
+@reset_trait_collections # initialize it
+
+# @generated function SimpleTraits.trait{TT<:Collection}(::Type{Intersection{TT}}) # this fn relies on <:Collection
+#     if trait(TT)===TT
+#         return :(Intersection{TT})
+#     else
+#         return :(Not{Intersection{TT}})
+#     end
+# end
+
+function SimpleTraits.trait{TT<:Collection}(::Type{Intersection{TT}}) # this fn relies on <:Collection
+    if trait(TT)===TT
+        return Intersection{TT}
+    else
+        return Not{Intersection{TT}}
+    end
+end
+
+
 
 ## Under the hood, a trait is then implemented for specific types by
 ## defining:
@@ -144,13 +216,13 @@ macro traitdef(tr)
         :(immutable $(esc(tr)) <: Trait end)
     elseif tr.head==:tuple
         ## Error: (I)
-        return :(throw(TraitException("Sub-traiting is not supported")))
-        # supert = Any[esc(tr.args[1].args[3]), map(esc, tr.args[2:end])...]
-        # tr = tr.args[1].args[1]
+#        return :(throw(TraitException("Sub-traiting is not supported")))
+        supert = Any[esc(tr.args[1].args[3]), map(esc, tr.args[2:end])...]
+        tr = tr.args[1].args[1]
         ## Or proper supertrait  (II)
-        # :(immutable $(esc(tr)) <: Trait{Tuple{$(supert...)}} end)
+        :(immutable $(esc(tr)) <: Trait{Intersection{Tuple{$(supert...)}}} end)
         ## Or alias  (III)
-        :(typealias $(esc(tr)) TraitIntersection{Tuple{$(supert...)}})
+        # :(typealias $(esc(tr)) Collection{Tuple{$(supert...)}})
     else
         throw(TraitException(
         "Either define trait as `@traitdef Tr{...}` or as subtrait of at least two supertraits `@traitdef Tr{...} <: Tr1, Tr2`"))
@@ -182,7 +254,7 @@ macro traitimpl(tr)
     fnhead = :($curmod.trait{$(curly...)}($arg))
     isfnhead = :($curmod.istrait{$(curly...)}($arg))
     quote
-        $trname <: TraitIntersection && error("Cannot use @traitimpl with TraitIntersection: implement each super-trait by hand.")
+        $trname <: Collection && error("Cannot use @traitimpl with Trait-Collection: implement each super-trait by hand.")
         $fnhead = $trname{$(paras...)}
         $isfnhead = true # Add the istrait definition as otherwise
                          # method-caching can be an issue.
@@ -225,11 +297,11 @@ function traitfn(tfn)
     end
     traits = fhead.args[1].args[2].args[1:end]
     trait_args = [isnegated(t) ? :($curmod.Not{$(t.args[2])}) : t for t in traits]
-    trait_args = length(trait_args)==1 ? trait_args[1] : :($curmod.TraitIntersection{Tuple{$(trait_args...)}})
+    trait_args = length(trait_args)==1 ? trait_args[1] : :(Tuple{$(trait_args...)})
     # TODO: add test to throw on @traitfn f56{X,Y; !(T4{X,Y}, T{X})}(x::X, y::Y)
 
     trait_args_noNot = [isnegated(t) ? :($(t.args[2])) : t for t in traits]
-    trait_args_noNot = length(trait_args_noNot)==1 ? trait_args_noNot[1] : :($curmod.TraitIntersection{Tuple{$(trait_args_noNot...)}})
+    trait_args_noNot = length(trait_args_noNot)==1 ? trait_args_noNot[1] : :(Tuple{$(trait_args_noNot...)})
     if init # the wrapper/trait-dispatch function:
         return :($fname{$(tpara...)}($(args...)) = (Base.@_inline_meta(); $fname($curmod.trait($trait_args_noNot), $(strip_tpara(args)...))))
         # TODO:
