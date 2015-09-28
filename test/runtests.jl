@@ -126,7 +126,7 @@ immutable B end
 @traitimpl TT2{B}
 
 # intersections
-@test trait(Intersection{Tuple{TT1{A},TT2{B}}})==Intersection{Tuple{TT1{A}, TT2{B}}}
+@test trait(Intersection{Tuple{TT1{A},TT2{B}}})==    Intersection{Tuple{TT1{A}, TT2{B}}}
 @test trait(Intersection{Tuple{TT1{A},TT2{A}}})==Not{Intersection{Tuple{TT1{A}, TT2{A}}}}
 @test trait(Intersection{Tuple{TT1{B},TT2{B}}})==Not{Intersection{Tuple{TT1{B}, TT2{B}}}}
 @test trait(Intersection{Tuple{TT1{B},TT2{A}}})==Not{Intersection{Tuple{TT1{B}, TT2{A}}}}
@@ -169,6 +169,7 @@ typealias SI4{X,Y} Intersection{Tuple{TT1{X}, TT2{Y}}}  # just an alias for the 
 X,Y = TypeVar(:XX, true), TypeVar(:YY,true)
 @test SI4{X,Y}===Intersection{Tuple{TT1{X}, TT2{Y}}}
 @test trait(SI4{A,B})===SI4{A,B}
+@test trait(SI4{A,A})===SI4{A,A} # <-- some julia-issue here!
 @test trait(SI4{B,B})===Not{SI4{B,B}}
 
 @traitfn f56{X,Y;  SI4{X,Y}}(x::X, y::Y) # note that SI4 is similar to {TT1{X},  TT2{Y}}
@@ -180,11 +181,24 @@ X,Y = TypeVar(:XX, true), TypeVar(:YY,true)
 @test f56(B(),B())==2
 @test f56(B(),A())==2
 
-# Subtraits
-@traitdef ST4{X,Y} <: TT1{X}, TT2{Y}  # just an alias for the Collectionsection
+# Trait inheritance
+@traitdef ST2{X,Y} <: TT1{X}
+@traitimpl ST2{A,B}
+@test istrait(ST2{A,B})
+@traitdef ST4{X,Y} <: TT1{X}, TT2{Y}
 X,Y = TypeVar(:XX, true), TypeVar(:YY,true)
 @test super(ST4{X,Y}).parameters[1]===Intersection{Tuple{TT1{X}, TT2{Y}}}
+@traitimpl ST4{A,B}
+@test istrait(ST4{A,B})
+@test_throws ST.TraitException @traitimpl ST4{Int,B}
+@traitimpl TT1{Int}
+@traitimpl ST4{Int,B}
+@test istrait(ST4{Int,B})
 
+
+######
+# TODO
+######
 
 ## Default arguments
 

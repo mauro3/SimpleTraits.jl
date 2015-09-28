@@ -1,8 +1,6 @@
+# This adds a few convenience functions & macros around Holy Traits.
 module SimpleTraits
 const curmod = module_name(current_module())
-
-# This is basically just adding a few convenience functions & macros
-# around Holy Traits.
 
 export Trait, istrait, @traitdef, @traitimpl, @traitfn, Not,
        IsAnything, IsNothing
@@ -12,14 +10,10 @@ type TraitException <: Exception
     msg::AbstractString
 end
 
-
-# All traits are subtypes of this trait.  SUPER is not used
-# but present to be compatible with Traits.jl.
-## @doc """
-## `abstract Trait{SUPER}`
 """
-All Traits are subtypes of abstract type Trait or a Tuple of Traits.
-SUPER contains the Intersection of its super traits.
+All Traits are subtypes of the abstract type Trait.  The parameter
+SUPER contains the Intersection of the super traits for a particular
+trait.
 """
 abstract Trait{SUPER} # SUPER<:Intersection but that is not possible
 # a concrete Trait will look like
@@ -31,7 +25,7 @@ abstract Trait{SUPER} # SUPER<:Intersection but that is not possible
 # end
 
 """
-The set of all types not belonging to a trait is encoded by wrapping
+The trait of all types not belonging to a trait is encoded by wrapping
 it with Not{}, e.g.  Not{Tr1{X,Y}}
 """
 immutable Not{T<:Trait} <: Trait end
@@ -41,7 +35,7 @@ stripNot{T<:Trait}(::Type{Not{T}}) = Not{T}
 stripNot{T<:Trait}(::Type{Not{Not{T}}}) = stripNot(T)
 
 """
-Collection of traits is used internally when defining a trait-method
+`Collection` is used internally when defining a trait-method
 like so
 ```
 @traitfn f55{X, Y;  TT1{X},  TT2{Y}}(x::X, y::Y)
@@ -53,14 +47,18 @@ like so
 It encodes the collection of traits `((TT1{X}, TT2{Y}),(!TT1{X},
 TT2{Y}),(TT1{X}, !TT2{Y}),(!TT1{X}, !TT2{Y}))`.  Therefore, it is not
 a single trait but kind of several traits.  This is just used inside
-trait-functions and should not be used otherwise.
-
-(It is just a typealias to a Tuple.)
+trait-functions and should not be used directly.
 """
 typealias Collection Tuple
 # TODO: should `typealias Collection Union` ?
-#immutable Collection{S<:Tuple} end
 
+
+"""
+Constructs the intersection of several traits.  A type(-tuple) belongs
+to a intersection if all its traits are fulfilled.
+"""
+immutable Intersection{S<:Tuple} <: Trait end
+# TODO: should S<:Union?
 # function Base.show{T<:Tuple}(io::IO, ti::Type{Collection{T}})
 #     println(io, "Collection of:")
 #     for Tr in T.parameters
@@ -75,18 +73,12 @@ typealias Collection Tuple
 # end
 
 
-"""
-Constructs the intersection of several traits.  A type(-tuple) belongs
-to a intersection if all its traits are fulfilled.
-"""
-immutable Intersection{S<:Tuple} <: Trait end
-# TODO: should S<:Union?
-
+## Trait Union:
 # """
 # A new trait can be created from the union of several other
 # (sub-)traits.  A type(-tuple) belongs to this trait if at least one of its
 # sub-traits are fulfilled.
-
+#
 # TODO: maybe implement this?
 # """
 # Constructs the union of several traits.  A type(-tuple) belongs
@@ -107,7 +99,7 @@ trait(IsBits{Array}) # returns Not{IsBits{Array}}
 ```
 
 Instead of using `@traitimpl` one can define a method for `trait` to
-implement a trait.  If this uses `@generated` functions it will be
+implement a trait.  If this uses `@generated` functions it should be
 in-lined away.  For example the `IsBits` trait is defined by:
 ```
 @traitdef IsBits{X}
@@ -118,7 +110,7 @@ trait{T<:Trait}(::Type{T}) = Not{T}
 trait{T<:Trait}(::Type{Not{T}}) = trait(T)
 
 """
-Collections use a generated method of the `trait` function to
+Collections and Intersections use a generated method of the `trait` function to
 evaluate whether a trait is fulfilled or not.  If a new type is added
 to a trait it can mean that this generated function is out of sync.
 Use this macro to re-initialize it. (Triggers a warning)
@@ -128,8 +120,10 @@ macro reset_trait_collections()
     # - make specific to one trait-collection/trait-function
     # - is it possible to make this cleaner?
     out = esc(:out46785) # poor man's gensym
-#    TT = esc(:TT73840)
+#    TT = esc(:TT73840)  # leads to strange error!
     TT = esc(gensym())
+
+    TTT = esc(:TT73840)
     quote
         @generated function SimpleTraits.trait{$TT<:Collection}(::Type{$TT})
             $out = Any[]
@@ -141,54 +135,16 @@ macro reset_trait_collections()
             end
             return :(Collection{$(out46785...)})
         end
-        # @generated function SimpleTraits.trait{$TT<:Collection}(::Type{Intersection{$TT}}) # this fn relies on <:Collection
-        #     if trait($TT)===$TT
-        #         return :(Intersection{$TT73840})
-        #     else
-        #         return :(Not{Intersection{$TT73840}})
-        #     end
-        # end
-
-        # @generated function SimpleTraits.trait{$TT<:Tuple}(::Type{SimpleTraits.Not{Collection{$TT}}})
-        #     $out = Any[]
-        #     for T in $TT.parameters
-        #         if !(T<:Trait)
-        #             error("Need a tuple of traits")
-        #         end
-        #         push!($out, trait(T))
-        #     end
-        #     return :(SimpleTraits.Collection{Tuple{$(out46785...)}})
-        # end
+        @generated function SimpleTraits.trait{$TTT<:Collection}(::Type{Intersection{$TTT}}) # this fn relies on <:Collection
+            if trait($TTT)===$TTT
+                return :(Intersection{$TT73840})
+            else
+                return :(Not{Intersection{$TT73840}})
+            end
+        end
     end
 end
 @reset_trait_collections # initialize it
-
-# @generated function SimpleTraits.trait{TT<:Collection}(::Type{Intersection{TT}}) # this fn relies on <:Collection
-#     if trait(TT)===TT
-#         return :(Intersection{TT})
-#     else
-#         return :(Not{Intersection{TT}})
-#     end
-# end
-
-function SimpleTraits.trait{TT<:Collection}(::Type{Intersection{TT}}) # this fn relies on <:Collection
-    if trait(TT)===TT
-        return Intersection{TT}
-    else
-        return Not{Intersection{TT}}
-    end
-end
-
-
-
-## Under the hood, a trait is then implemented for specific types by
-## defining:
-#   trait(::Type{Tr1{Int,Float64}}) = Tr1{Int,Float64}
-# or
-#   trait{I<:Integer,F<:FloatingPoint}(::Type{Tr1{I,F}}) = Tr1{I,F}
-#
-# Note due to invariance, this does probably not the right thing:
-#   trait(::Type{Tr1{Integer,FloatingPoint}}) = Tr1{Integer, FloatingPoint}
 
 """
 This function checks whether a trait is fulfilled by a specific
@@ -200,10 +156,13 @@ istrait(Tr1{Int,Float64}) => return true or false
 istrait(::Any) = error("Argument is not a Trait.")
 istrait{T<:Trait}(tr::Type{T}) = trait(tr)==stripNot(tr) ? true : false # Problem, this can run into issue #265
                                                                         # thus it is redefine when traits are defined
+                                                                        # with @traitimpl
 
 """
-Used to define a trait.  Traits, like types, are camel cased.
-Often they start with `Is` or `Has`.
+Used to define a trait.  Style wise I advocate the following:
+
+- Traits, like types, are camel cased.
+- Often they start with `Is` or `Has`.
 
 Examples:
 ```
@@ -214,18 +173,24 @@ Examples:
 macro traitdef(tr)
     if tr.head==:curly
         :(immutable $(esc(tr)) <: Trait end)
-    elseif tr.head==:tuple
+    elseif tr.head==:tuple || tr.head==:comparison # trait inheritance
+        if tr.head==:comparison
+            supert = Any[esc(tr.args[3])]
+            tr = tr.args[1]
+        else
+            supert = Any[esc(tr.args[1].args[3]), map(esc, tr.args[2:end])...]
+            tr = tr.args[1].args[1]
+        end
+        ## There are a few options to handle this:
         ## Error: (I)
-#        return :(throw(TraitException("Sub-traiting is not supported")))
-        supert = Any[esc(tr.args[1].args[3]), map(esc, tr.args[2:end])...]
-        tr = tr.args[1].args[1]
+        # return :(throw(TraitException("Sub-traiting is not supported")))
         ## Or proper supertrait  (II)
         :(immutable $(esc(tr)) <: Trait{Intersection{Tuple{$(supert...)}}} end)
         ## Or alias  (III)
         # :(typealias $(esc(tr)) Collection{Tuple{$(supert...)}})
     else
         throw(TraitException(
-        "Either define trait as `@traitdef Tr{...}` or as subtrait of at least two supertraits `@traitdef Tr{...} <: Tr1, Tr2`"))
+        "Either define trait as `@traitdef Tr{...}` or with one or more super-traits `@traitdef Tr{...} <: Tr1, Tr2`"))
     end
 end
 
@@ -238,6 +203,8 @@ Example:
 @traitdef IsFast{X}
 @traitimpl IsFast{Array{Int,1}}
 ```
+
+This errors if super-traits are not defined.
 """
 macro traitimpl(tr)
     # makes
@@ -254,7 +221,9 @@ macro traitimpl(tr)
     fnhead = :($curmod.trait{$(curly...)}($arg))
     isfnhead = :($curmod.istrait{$(curly...)}($arg))
     quote
-        $trname <: Collection && error("Cannot use @traitimpl with Trait-Collection: implement each super-trait by hand.")
+        $trname <: Intersection && error("Cannot use @traitimpl with Trait-Intersection: implement each intersected trait by hand.")
+        check_supertraits($(esc(tr)))
+        # TODO: allow option to implement all supertypes as well
         $fnhead = $trname{$(paras...)}
         $isfnhead = true # Add the istrait definition as otherwise
                          # method-caching can be an issue.
@@ -358,7 +327,7 @@ otherwise the old one is cached:
 
 ### Dispatching on several traits
 
-Is possible using this syntax:
+Is possible to dispatch on several traits using this syntax:
 ```
 @traitfn f55{X, Y;  TT1{X},  TT2{Y}}(x::X, y::Y)
 @traitfn f55{X, Y;  TT1{X},  TT2{Y}}(x::X, y::Y) = 1
@@ -366,8 +335,8 @@ Is possible using this syntax:
 @traitfn f55{X, Y;  TT1{X}, !TT2{Y}}(x::X, y::Y) = 3
 
 ```
-Note that all methods need to feature the same traits (possibly
-negated) in the same order.  Any method violating that will never be
+*Note that all methods need to feature the same traits (possibly
+negated) in the same order!*  Any method violating that will never be
 called (and no error is thrown!).
 """
 macro traitfn(tfn)
@@ -377,6 +346,30 @@ end
 ######
 ## Helpers
 ######
+
+"""Returns the super traits"""
+function getsuper{T<:Trait}(t::Type{T})
+    S = t.super.parameters[1]
+    if isa(S,TypeVar)
+        return Base.Core.svec()
+    else
+        return S.parameters[1].parameters
+    end
+end
+getsuper{T<:Intersection}(t::Type{T}) =  t.parameters[1].parameters
+
+"""
+Checks whether all supertraits are fulfilled.  If not, throws an error.
+"""
+check_supertraits(::Any) = error("Argument to `check_supertraits` is not a Trait.")
+function check_supertraits{T<:Trait}(tr::Type{T})
+    for ST in getsuper(tr)
+        if !istrait(ST)
+            throw(TraitException("Super trait $ST is not fulfilled.  If it should be fulfilled, run `@traitimpl $ST` first."))
+        end
+    end
+end
+
 
 # true if :(!(...))
 isnegated(t::Expr) = t.head==:call  && t.args[1]==:!
