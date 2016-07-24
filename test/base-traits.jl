@@ -1,4 +1,5 @@
 using SimpleTraits.BaseTraits
+using Compat: view
 
 @test istrait(IsAnything{Any})
 @test istrait(IsAnything{Union{}})
@@ -14,17 +15,19 @@ using SimpleTraits.BaseTraits
 @test istrait(IsImmutable{Float64})
 @test !istrait(IsImmutable{Vector{Int}})
 
-@test !istrait(IsCallable{Float64})
 @test istrait(IsCallable{Function})
 
 if VERSION>v"0.4-" # use @generated functions
-    @test istrait(IsContiguous{SubArray{Int64,1,Array{Int64,1},Tuple{UnitRange{Int64}},1}})
-    @test !istrait(IsContiguous{SubArray{Int64,1,Array{Int64,1},Tuple{StepRange{Int64,Int64}},1}})
+    a = collect(1:5)
+    b = view(a, 2:3)
+    c = view(a, 1:2:5)
+    @test istrait(IsContiguous{typeof(b)})
+    @test !istrait(IsContiguous{typeof(c)})
 
     @test istrait(IsFastLinearIndex{Vector})
     @test !istrait(IsFastLinearIndex{AbstractArray})
 
-    @test istrait(IsCallable{Base.AddFun})
+    if VERSION < v"0.5.0-dev"
+        @test istrait(IsCallable{Base.AddFun})
+    end
 end
-
-
