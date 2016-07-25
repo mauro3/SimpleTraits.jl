@@ -1,6 +1,8 @@
 module SimpleTraits
 const curmod = module_name(current_module())
 
+using Compat
+
 # This is basically just adding a few convenience functions & macros
 # around Holy Traits.
 
@@ -202,8 +204,8 @@ end
 type GenerateTypeVars{CASE}
 end
 Base.start(::GenerateTypeVars) = 1
-Base.next(::GenerateTypeVars{:upcase}, state) = (symbol("X$state"), state+1) # X1,..
-Base.next(::GenerateTypeVars{:lcase}, state) = (symbol("x$state"), state+1)  # x1,...
+Base.next(::GenerateTypeVars{:upcase}, state) = (Symbol("X$state"), state+1) # X1,..
+Base.next(::GenerateTypeVars{:lcase}, state) = (Symbol("x$state"), state+1)  # x1,...
 Base.done(::GenerateTypeVars, state) = false
 
 ####
