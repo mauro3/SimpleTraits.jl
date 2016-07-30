@@ -101,3 +101,7 @@ trait = SimpleTraits.trait
 # Other tests
 #####
 include("base-traits.jl")
+
+if VERSION >= v"0.5.0-dev"
+    include("backtraces.jl")
+end

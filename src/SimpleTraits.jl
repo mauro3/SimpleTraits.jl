@@ -142,11 +142,20 @@ function traitfn(tfn)
     else
         val = :(::Type{$trait})
     end
+    # Get line info for better backtraces
+    ln = findline(tfn)
+    if isa(ln, Expr)
+        pushloc = Expr(:meta, :push_loc, ln.args[2], fname, ln.args[1])
+        poploc = Expr(:meta, :pop_loc)
+    else
+        pushloc = poploc = nothing
+    end
+    retsym = gensym()
     if hasmac
-        fn = :(@dummy $fname{$(typs...)}($val, $(args...)) = $fbody)
+        fn = :(@dummy $fname{$(typs...)}($val, $(args...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
         fn.args[1] = mac # replace @dummy
     else
-        fn = :($fname{$(typs...)}($val, $(args...)) = $fbody)
+        fn = :($fname{$(typs...)}($val, $(args...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
     end
     quote
         $fname{$(typs...)}($(args...)) = (Base.@_inline_meta(); $fname($curmod.trait($trait), $(strip_tpara(args)...)))
@@ -207,6 +216,20 @@ Base.start(::GenerateTypeVars) = 1
 Base.next(::GenerateTypeVars{:upcase}, state) = (Symbol("X$state"), state+1) # X1,..
 Base.next(::GenerateTypeVars{:lcase}, state) = (Symbol("x$state"), state+1)  # x1,...
 Base.done(::GenerateTypeVars, state) = false
+
+####
+# Annotating the source location
+####
+
+function findline(ex::Expr)
+    ex.head == :line && return ex
+    for a in ex.args
+        ret = findline(a)
+        isa(ret, Expr) && return ret
+    end
+    nothing
+end
+findline(arg) = nothing
 
 ####
 # Extras
