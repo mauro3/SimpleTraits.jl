@@ -119,47 +119,61 @@ end
 # @traitfn f{X,Y;  Tr1{X,Y}}(x::X,y::Y) = ...
 # @traitfn f{X,Y; !Tr1{X,Y}}(x::X,y::Y) = ... # which is just sugar for:
 # @traitfn f{X,Y; Not{Tr1{X,Y}}}(x::X,y::Y) = ...
-function traitfn(tfn)
-    # Need
-    # f{X,Y}(x::X,Y::Y) = f(trait(Tr1{X,Y}), x, y)
-    # f(::False, x, y)= ...
-    if tfn.head==:macrocall
-        hasmac = true
-        mac = tfn.args[1]
-        tfn = tfn.args[2]
-    else
-        hasmac = false
-    end
-    fhead = tfn.args[1]
-    fbody = tfn.args[2]
-    fname = fhead.args[1].args[1]
-    args = insertdummy(fhead.args[2:end])
-    typs = fhead.args[1].args[3:end]
-    trait = fhead.args[1].args[2].args[1]
-    if isnegated(trait)
-        trait = trait.args[2]
-        val = :(::Type{$curmod.Not{$trait}})
-    else
-        val = :(::Type{$trait})
-    end
-    # Get line info for better backtraces
-    ln = findline(tfn)
-    if isa(ln, Expr)
-        pushloc = Expr(:meta, :push_loc, ln.args[2], fname, ln.args[1])
-        poploc = Expr(:meta, :pop_loc)
-    else
-        pushloc = poploc = nothing
-    end
-    retsym = gensym()
-    if hasmac
-        fn = :(@dummy $fname{$(typs...)}($val, $(args...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
-        fn.args[1] = mac # replace @dummy
-    else
-        fn = :($fname{$(typs...)}($val, $(args...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
-    end
-    quote
-        $fname{$(typs...)}($(args...)) = (Base.@_inline_meta(); $fname($curmod.trait($trait), $(strip_tpara(args)...)))
-        $fn
+let dispatch_cache = Set()  # to ensure that the trait-dispatch function is defined only once per pair
+    global traitfn
+    function traitfn(tfn)
+        # Need
+        # f{X,Y}(x::X,Y::Y) = f(trait(Tr1{X,Y}), x, y)
+        # f(::False, x, y)= ...
+        if tfn.head==:macrocall
+            hasmac = true
+            mac = tfn.args[1]
+            tfn = tfn.args[2]
+        else
+            hasmac = false
+        end
+        fhead = tfn.args[1]
+        fbody = tfn.args[2]
+        fname = fhead.args[1].args[1]
+        args0 = fhead.args[2:end]  # version before adding gensyms
+        args = insertdummy(fhead.args[2:end])
+        typs = fhead.args[1].args[3:end]
+        trait_opposite = fhead.args[1].args[2].args[1]
+        trait = trait_opposite
+        if isnegated(trait)
+            trait = trait.args[2]
+            val = :(::Type{$curmod.Not{$trait}})
+        else
+            val = :(::Type{$trait})
+            trait_opposite = Expr(:call, :!, trait_opposite)  # generate the opposite
+        end
+        # Get line info for better backtraces
+        ln = findline(tfn)
+        if isa(ln, Expr)
+            pushloc = Expr(:meta, :push_loc, ln.args[2], fname, ln.args[1])
+            poploc = Expr(:meta, :pop_loc)
+        else
+            pushloc = poploc = nothing
+        end
+        retsym = gensym()
+        if hasmac
+            fn = :(@dummy $fname{$(typs...)}($val, $(args...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
+            fn.args[1] = mac # replace @dummy
+        else
+            fn = :($fname{$(typs...)}($val, $(args...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
+        end
+        ex = fn
+        key = (current_module(), fname, typs, args0, trait_opposite)
+        if !(key ∈ dispatch_cache)
+            ex = quote
+                $fname{$(typs...)}($(args...)) = (Base.@_inline_meta(); $fname($curmod.trait($trait), $(strip_tpara(args)...)))
+                $ex
+            end
+            push!(dispatch_cache, key)
+        else
+            delete!(dispatch_cache, key) # permits function redefinition if that's what we want
+        end
+        ex
     end
 end
 """
