@@ -1,6 +1,7 @@
 # SimpleTraits
 
 [![Build Status](https://travis-ci.org/mauro3/SimpleTraits.jl.svg?branch=master)](https://travis-ci.org/mauro3/SimpleTraits.jl)
+[![Build Status](https://ci.appveyor.com/api/projects/status/github/mauro3/SimpleTraits.jl?branch=master&svg=true)](https://ci.appveyor.com/project/mauro3/simpletraits-jl/branch/master)
 
 Note that Julia 0.3 is only supported up to tag
 [v0.0.1](https://github.com/mauro3/SimpleTraits.jl/tree/v0.0.1).
@@ -147,6 +148,9 @@ b2 = f(b)
 
 # To ponder
 
+- There is a big update sitting in the branch
+  [m3/multitraits](https://github.com/mauro3/SimpleTraits.jl/pull/2);
+  but I never quite finished it.  It would also address the next point:
 - Could type inheritance be used for sub-traits
   ([Jutho's idea](https://github.com/JuliaLang/julia/issues/10889#issuecomment-94317470))?
   In particular could it be used in such a way that it is compatible
