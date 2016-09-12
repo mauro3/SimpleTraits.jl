@@ -117,18 +117,18 @@ end
 istrait(IsBits{A}) # true
 ```
 
-In Julia-0.4 dynamic dispatch can be avoided using a generated
-function:
+Dynamic dispatch can be avoided using a generated
+function (or maybe sometimes `Base.@pure` functions?):
 ```julia
 @traitdef IsBits{X}
 @generated function SimpleTraits.trait{X1}(::Type{IsBits{X1}})
     isbits(X1) ? :(IsBits{X1}) : :(Not{IsBits{X1}})
 end
 ```
+Note that these programmed-traits can be combined with `@traitimpl`,
+i.e. program the general case and add exceptions with `@traitimpl`.
 
-Note that these programmed-traits can be combined with `@traitimpl`.
-
-Trait functions can be generated functions:
+Note also that trait functions can be generated functions:
 ```julia
 @traitfn @generated fg{X; Tr1{X}}(x::X) = (println(x); :x)
 ```
