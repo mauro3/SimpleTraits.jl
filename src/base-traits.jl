@@ -29,7 +29,7 @@ typealias IsNothing{X} Not{IsAnything{X}}
 
 "Trait of all leaf types types"
 @traitdef IsLeafType{X}
-@generated trait{X}(::Type{IsLeafType{X}}) = X.mutable ? :(Not{IsLeafType{X}}) : :(IsLeafType{X})
+@generated trait{X}(::Type{IsLeafType{X}}) = isleaftype(X) ? :(Not{IsLeafType{X}}) : :(IsLeafType{X})
 
 "Types which have contiguous memory layout"
 @traitdef IsContiguous{X} # https://github.com/JuliaLang/julia/issues/10889
