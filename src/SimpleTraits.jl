@@ -14,13 +14,19 @@ export Trait, istrait, @traitdef, @traitimpl, @traitfn, Not
 ## `abstract Trait{SUPER}`
 
 """
-All Traits are subtypes of abstract type Trait.  (SUPER is not used
-here but in Traits.jl)
+All Traits are subtypes of abstract type Trait.
+
+A concrete Trait will look like:
+```julia
+immutable Tr1{X,Y} <: Trait end
+```
+where X and Y are the types involved in the trait.
+
+
+(SUPER is not used here but in Traits.jl, thus retained for possible
+future compatibility.)
 """
 abstract Trait{SUPER}
-# a concrete Trait will look like
-## immutable Tr1{X,Y} <: Trait end
-# where X and Y are the types involved in the trait.
 
 """
 The set of all types not belonging to a trait is encoded by wrapping
@@ -34,8 +40,9 @@ stripNot{T<:Trait}(::Type{Not{T}}) = Not{T}
 stripNot{T<:Trait}(::Type{Not{Not{T}}}) = stripNot(T)
 
 """
-A trait is defined as full filled if this function is the identity function for that trait.
-Otherwise it returns the trait wrapped in `Not`.
+A trait is defined as full-filled if this function is the identity
+function for that trait.  Otherwise it returns the trait wrapped in
+`Not`.
 
 Example:
 ```
@@ -43,10 +50,10 @@ trait(IsBits{Int}) # returns IsBits{Int}
 trait(IsBits{Array}) # returns Not{IsBits{Array}}
 ```
 
-Instead of using `@traitimpl` one can define a method for `trait` to
-implement a trait.  If this uses `@generated` functions it will be
-in-lined away.  For example the `IsBits` trait is defined by:
-```
+Usually this function is defined when using the `@traitimpl` macro.
+
+However, instead of using `@traitimpl` one can define a method for
+`trait` to implement a trait, see the README.
 """
 trait{T<:Trait}(::Type{T}) = Not{T}
 trait{T<:Trait}(::Type{Not{T}}) = trait(T)
@@ -71,11 +78,20 @@ istrait(::Any) = error("Argument is not a Trait.")
 istrait{T<:Trait}(tr::Type{T}) = trait(tr)==stripNot(tr) ? true : false # Problem, this can run into issue #265
                                                                         # thus is redefine when traits are defined
 """
-Used to define a trait.  Traits, like types, are camel cased.
-Often they start with `Is` or `Has`.
+
+Used to define a trait.  Traits, like types, are camel cased.  I
+suggest to start them with a verb, e.g. `IsImmutable`, to distinguish
+them from actual types, which are usually nouns.
+
+Traits need to have one or more (type-)parameters to specify the type
+to which the trait is applied.  For instance `IsImmutable{Int}`
+signifies that `Int` is part of `IsImmutable` (although whether that
+is true needs to be checked with the `istrait` function).  Most traits
+will be one-parameter traits, however, several parameters are useful
+when there is a "contract" between several types.
 
 Examples:
-```
+```julia
 @traitdef IsFast{X}
 @traitdef IsSlow{X,Y}
 ```
@@ -89,7 +105,7 @@ Used to add a type or type-tuple to a trait.  By default a type does
 not belong to a trait.
 
 Example:
-```
+```julia
 @traitdef IsFast{X}
 @traitimpl IsFast{Array{Int,1}}
 ```
@@ -176,13 +192,19 @@ let dispatch_cache = Set()  # to ensure that the trait-dispatch function is defi
         ex
     end
 end
+
 """
-Defines a function dispatching on a trait:
+Defines a function dispatching on a trait. Examples:
+
+```julia
+@traitfn f{X;  Tr1{X}}(x::X,y) = ...
+@traitfn f{X; !Tr1{X}}(x::X,y) = ...
+
+@traitfn f{X,Y;  Tr2{X,Y}}(x::X,y::Y) = ...
+@traitfn f{X,Y; !Tr2{X,Y}}(x::X,y::Y) = ...
 ```
-@traitfn f{X,Y;  Tr1{X,Y}}(x::X,y::Y) = ...
-@traitfn f{X,Y; !Tr1{X,Y}}(x::X,y::Y) = ... # which is just sugar for:
-@traitfn f{X,Y; Not{Tr1{X,Y}}}(x::X,y::Y) = ...
-```
+
+Note that the second example is just syntax sugar for `@traitfn f{X,Y; Not{Tr1{X,Y}}}(x::X,y::Y) = ...`.
 """
 macro traitfn(tfn)
     esc(traitfn(tfn))
