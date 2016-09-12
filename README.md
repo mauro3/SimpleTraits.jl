@@ -4,15 +4,16 @@
 [![Build Status](https://ci.appveyor.com/api/projects/status/github/mauro3/SimpleTraits.jl?branch=master&svg=true)](https://ci.appveyor.com/project/mauro3/simpletraits-jl/branch/master)
 
 This package provides a macro-based implementation of traits, using
-the [Tim Holy trait trick](https://github.com/JuliaLang/julia/issues/2345#issuecomment-54537633).
-For a bit of background and a quick introduction to traits watch my
-10min [JuliaCon 2015](https://youtu.be/j9w8oHfG1Ic) talk.
-
+[Tim Holy's trait trick](https://github.com/JuliaLang/julia/issues/2345#issuecomment-54537633).
 The main idea behind traits is to group types outside the
-type-hierarchy and to make dispatch work on that grouping.  The
+type-hierarchy and to make dispatch work with that grouping.  The
 difference to Union-types is that types can be added to a trait after
 the creation of the trait, whereas Union types are fixed after
-creation.
+creation.  The cool thing about Tim's trick is that there is no
+performance impact compared to using ordinary dispatch.  For a bit of
+background and a quick introduction to traits watch my 10min
+[JuliaCon 2015](https://youtu.be/j9w8oHfG1Ic) talk.
+
 
 One good example of the use of traits is the
 [abstract array interface](http://docs.julialang.org/en/release-0.5/manual/interfaces/#abstract-arrays)
@@ -22,88 +23,96 @@ internal indexing works.  The advantage to use a trait there is that
 one is free to create a type hierarchy independent of this particular
 "trait" of the array(s).
 
-Tim Holy's
-[light endorsement](https://github.com/mauro3/SimpleTraits.jl/pull/6#issuecomment-236886253)
-of SimpleTraits: "I'd say that compared to manually writing out the
-trait-dispatch, the "win" is not enormous, but it is a little nicer."
-I suspect that, if you don't write Holy-traits before breakfast, your
-"win" might be slightly bigger ;-)
+Tim Holy
+[endorses](https://github.com/mauro3/SimpleTraits.jl/pull/6#issuecomment-236886253)
+SimpleTraits, a bit: "I'd say that compared to manually writing out
+the trait-dispatch, the "win" is not enormous, but it is a little
+nicer."  I suspect that — if you don't write Holy-traits before
+breakfast — your "win" should be greater ;-)
 
 # Manual
 
 Traits are defined with `@traitdef`:
 ```julia
 using SimpleTraits
-@traitdef Tr1{X}
-@traitdef Tr2{X,Y} # traits can have several parameters
+@traitdef IsNice{X}
+@traitdef BelongTogether{X,Y} # traits can have several parameters
 ```
 All traits have one or more (type-)parameters to specify the type to
-which the trait is applied.  For instance `Tr1{Int}` signifies that
-`Int` is a member of `Tr1` (although whether that is true needs to be
+which the trait is applied.  For instance `IsNice{Int}` signifies that
+`Int` is a member of `IsNice` (although whether that is true needs to be
 checked with the `istrait` function).  Most traits will be
 one-parameter traits, however, several parameters are useful when
 there is a "contract" between several types.
 
+As a *style convention*, I suggest to use trait names which start with
+a verb, as above two traits.  This makes distinguishing between traits
+and types easier as type names are usually nouns.
 
 Add types to a trait-group with `@traitimpl`:
 ```julia
-@traitimpl Tr1{Int}
-@traitimpl Tr2{Int,String}
+@traitimpl IsNice{Int}
+@traitimpl BelongTogether{Int,String}
 ```
 
 It can be checked whether a type belongs to a trait with `istrait`:
 ```julia
 using Base.Test
-@test istrait(Tr1{Int})
-@test !istrait(Tr2{Int,Int}) # only Tr2{Int,String} was added above
+@test istrait(IsNice{Int})
+@test !istrait(BelongTogether{Int,Int}) # only BelongTogether{Int,String} was added above
 ```
 
 Functions which dispatch on traits are constructed like:
 ```julia
-@traitfn f{X; Tr1{X}}(x::X) = 1
-@traitfn f{X; !Tr1{X}}(x::X) = 2
+@traitfn f{X; IsNice{X}}(x::X) = "Very nice!"
+@traitfn f{X; !IsNice{X}}(x::X) = "Not so nice!"
 ```
-This means that a type `X` which is part of the trait `Tr1` will
-dispatch to the method returning `1`, otherwise to the one returning `2`:
+This means that a type `X` which is part of the trait `IsNice` will
+dispatch to the method returning `"Very nice!"`, otherwise to the one
+returning `"Not so nice!"`:
 ```julia
-@test f(5)==1
-@test f(5.)==2
+@test f(5)=="Very nice!"
+@test f(5.)=="Not so nice!"
 ```
 
-Similarly for `Tr2` which has two parameters:
+Similarly for `BelongTogether` which has two parameters:
 ```julia
-@traitfn f{X,Y; Tr2{X,Y}}(x::X,y::Y,z) = 1
-@test f(5, "b", "a")==1
-@test_throws MethodError f(5, 5, "a")==2
+@traitfn f{X,Y; BelongTogether{X,Y}}(x::X,y::Y) = "$x and $y forever!"
+@test f(5, "b")=="5 and b forever!"
+@test_throws MethodError f(5, 5)
 
-@traitfn f{X,Y; !Tr2{X,Y}}(x::X,y::Y,z) = 2
-@test f(5, 5, "a")==2
+@traitfn f{X,Y; !BelongTogether{X,Y}}(x::X,y::Y) = "$x and $y cannot stand each other!"
+@test f(5, 5)=="5 and 5 cannot stand each other!"
 ```
 
 Note that for a particular generic function, dispatch on traits can only work
 on one trait for a given signature.  Continuing above example, this
 *does not work* as one may expect:
 ```julia
-@traitdef Tr3{X}
-@traitfn f{X; Tr3{X}}(x::X) = 10
+@traitdef IsCool{X}
+@traitfn f{X; IsCool{X}}(x::X) = "Groovy!"
 ```
 as this definition will just overwrite the definition `@traitfn f{X;
-Tr1{X}}(x::X) = 1` from above.  If you need to dispatch on several
-traits, then you're out of luck.  But please voice your grievance over
-in pull request
+IsNice{X}}(x::X) = 1` from above.  In Julia 0.5 this gives a nice
+warning though.
+
+If you need to dispatch on several traits, then you're out of luck.
+But please voice your grievance over in pull request
 [#2](https://github.com/mauro3/SimpleTraits.jl/pull/2).
 
 ## Advanced features
 
 Instead of using `@traitimpl` to add types to traits, it can be
-programmed.  Running `@traitimpl Tr1{Int}` essentially expands to
+programmed.  Running `@traitimpl IsNice{Int}` essentially expands to
 ```julia
-SimpleTraits.trait{X1 <: Int}(::Type{Tr1{X1}}) = Tr1{X1}
+SimpleTraits.trait{X1 <: Int}(::Type{IsNice{X1}}) = IsNice{X1}
 ```
-i.e. it is just the identity function.  So instead of using `@traitimpl` this
-can be coded directly.  Note that anything but a constant function
-will probably not be inlined away by the JIT and will lead to slower
-dynamic dispatch.
+I.e. `trait` is the identity function for a fulfilled trait and
+returns `Not{TraitInQuestion{...}}` otherwise (this is the fall-back
+for `<:Any`).  So instead of using `@traitimpl` this can be coded
+directly.  Note that anything but a constant function will probably
+not be inlined away by the JIT and will lead to slower dynamic
+dispatch.
 
 Example leading to dynamic dispatch:
 ```julia
@@ -130,7 +139,7 @@ i.e. program the general case and add exceptions with `@traitimpl`.
 
 Note also that trait functions can be generated functions:
 ```julia
-@traitfn @generated fg{X; Tr1{X}}(x::X) = (println(x); :x)
+@traitfn @generated fg{X; IsNice{X}}(x::X) = (println(x); :x)
 ```
 
 # Base Traits
