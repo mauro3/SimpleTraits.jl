@@ -14,7 +14,6 @@ performance impact compared to using ordinary dispatch.  For a bit of
 background and a quick introduction to traits watch my 10min
 [JuliaCon 2015](https://youtu.be/j9w8oHfG1Ic) talk.
 
-
 One good example of the use of traits is the
 [abstract array interface](http://docs.julialang.org/en/release-0.5/manual/interfaces/#abstract-arrays)
 in Julia-Base.  An abstract array either belongs to the
@@ -74,6 +73,9 @@ returning `"Not so nice!"`:
 @test f(5)=="Very nice!"
 @test f(5.)=="Not so nice!"
 ```
+Note that calling a trait-function is just like calling any other
+function.  Thus there is no extra mental gymnastics required for a
+"user" of a trait-based package.
 
 Similarly for `BelongTogether` which has two parameters:
 ```julia
@@ -84,6 +86,8 @@ Similarly for `BelongTogether` which has two parameters:
 @traitfn f{X,Y; !BelongTogether{X,Y}}(x::X,y::Y) = "$x and $y cannot stand each other!"
 @test f(5, 5)=="5 and 5 cannot stand each other!"
 ```
+
+## Gotcha
 
 Note that for a particular generic function, dispatch on traits can only work
 on one trait for a given signature.  Continuing above example, this
@@ -101,6 +105,11 @@ But please voice your grievance over in pull request
 [#2](https://github.com/mauro3/SimpleTraits.jl/pull/2).
 
 ## Advanced features
+
+The macros of the previous section are the official API of the package
+and should be reasonably stable.  What follows in this section is
+"under the hood" and may well be updated (but still signalled with
+minor version changes).
 
 Instead of using `@traitimpl` to add types to traits, it can be
 programmed.  Running `@traitimpl IsNice{Int}` essentially expands to
@@ -191,6 +200,36 @@ The reason for splitting this away from Traits.jl are:
 
 My [*JuliaCon 2015*](https://youtu.be/j9w8oHfG1Ic) talk gives a 10
 minute introduction to Traits.jl and SimpleTraits.jl.
+
+# The Future
+
+The future of traits in Julia-Base: According to Stefan Karpinski's
+JuliaCon 2016 talk, [Julia 1.0](https://youtu.be/5gXMpbY1kJY), traits
+are scheduled to land after Julia 1.0.  Although, if someone gets
+cracking, they may well happen pre-1.0.  My crystal ball tells me that
+all or most of the functionality of this package will be supported in
+the future trait system (multiparameter-traits may not be). Thus I
+expect the transition will be mostly a matter of a syntax update and
+less of a semantic update.  Also, an advantage to using this package
+versus hand-coding Holy-traits will be that all occurrences of trait
+usage are clearly marked and thus easier to update.
+
+The future of this package: I see it as light-weight package focusing
+on letting functions use dispatch based on traits.  This dispatch is
+currently fairly limited, see section "Gotcha" above, but may be
+expanded in the future: either through something like in PR
+[m3/multitraits](https://github.com/mauro3/SimpleTraits.jl/pull/2) or
+through a more general generated-function approach.
+
+In the unlikely event that I find myself with too much time on my
+hands, I may try to develop a companion package to allow the
+specification of a trait in terms of interfaces.  The combination of
+the two packages would then have similar functionality to my
+experimental package [Traits.jl](https://github.com/mauro3/Traits.jl).
+If anyone fancies a go at writing this companion package, I would be
+very happy to help and contribute.  After the
+[type-system overhaul](https://github.com/JuliaLang/julia/pull/18457)
+lands, this should be much less hackish than what's in Traits.jl.
 
 # Misc
 
