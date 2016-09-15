@@ -87,22 +87,51 @@ Similarly for `BelongTogether` which has two parameters:
 @test f(5, 5)=="5 and 5 cannot stand each other!"
 ```
 
-## Gotcha
+## Details of method dispatch
 
-Note that for a particular generic function, dispatch on traits can only work
-on one trait for a given signature.  Continuing above example, this
-*does not work* as one may expect:
+Defining a trait function adds: one new method (or overwrites one) to
+the generic function, which contains the logic; and one helper
+method to do the dispatch (Tim's trick), if it has not been defined
+before.
+
+When calling a generic function which has some *trait-methods*,
+dispatch will first work on the types as normal.  If the selected
+method is a trait-method then trait dispatch will kick in too.
+Example:
 ```julia
-@traitdef IsCool{X}
-@traitfn f{X; IsCool{X}}(x::X) = "Groovy!"
+@traitdef Tr{X}
+
+fn(x::Integer) = 1 # a normal method
+@traitfn fn{X<:AbstractFloat;  Tr{X}}(x::X) = 2
+@traitfn fn{X<:AbstractFloat; !Tr{X}}(x::X) = 3
+
+@traitimpl Tr{Float32}
+@traitimpl Tr{Int} # this does not impact dispatch of `fn`
+
+fn(5) # -> 1; dispatch only happens on the type
+fn(Float32(5)) # -> 2; dispatch through traits
+fn(Float64(5)) # -> 3; dispatch through traits
 ```
-as this definition will just overwrite the definition `@traitfn f{X;
-IsNice{X}}(x::X) = 1` from above.  In Julia 0.5 this gives a nice
+
+Further note that for a particular trait-method dispatch only works on
+one trait.  Continuing above example, this *does not work* as one may
+expect:
+```julia
+@traitdef Tr2{X}
+@traitfn fn{X<:AbstractFloat; Tr2{X}}(x::X) = 4
+
+@traitimpl Tr2{Float16}
+fn(Float16(5)) # -> 4; dispatch through traits
+fn(Float32(5)) # -> MethodError; dispatch defined in previous example
+               #    was overwritten above
+```
+This last definition of `fn` just overwrites the definition `@traitfn
+f{X; Tr{X}}(x::X) = 2` from above.  In Julia 0.5 this gives a nice
 warning though.
 
-If you need to dispatch on several traits, then you're out of luck.
-But please voice your grievance over in pull request
-[#2](https://github.com/mauro3/SimpleTraits.jl/pull/2).
+If you need to dispatch on several traits in a single trait-method,
+then you're out of luck.  But please voice your grievance over in pull
+request [#2](https://github.com/mauro3/SimpleTraits.jl/pull/2).
 
 ## Advanced features
 
@@ -150,6 +179,39 @@ Note also that trait functions can be generated functions:
 ```julia
 @traitfn @generated fg{X; IsNice{X}}(x::X) = (println(x); :x)
 ```
+
+# Innards
+
+The function `macroexpand` shows the syntax transformations a macro
+does. Here the edited output of running it for the macros of this package:
+```julia
+julia> macroexpand(:(@traitdef Tr{X}))
+
+immutable Tr{X} <: SimpleTraits.Trait
+end
+
+julia> macroexpand(:(@traitimpl Tr{Int}))
+
+# this function does the grouping of types into traits:
+SimpleTraits.trait{X1 <: Int}(::Type{Tr{X1}}) = Tr{X1}
+SimpleTraits.istrait{X1 <: Int}(::Type{Tr{X1}}) = true # for convenience, really
+
+julia> macroexpand(:(@traitfn g{X; Tr{X}}(x::X)= x+1))
+
+@inline g{X}(x::X) = g(trait(Tr{X}), x) # this is Tim's trick, using above grouping-function
+g{X}(::Type{Tr{X}},x::X) = x + 1 # this is the logic
+
+julia> macroexpand(:(@traitfn g{X; !Tr{X}}(x::X)= x+1000))
+
+# the trait dispatch helper function needn't be defined twice,
+# only the logic:
+g{X}(::Type{ Not{Tr{X}} }, x::X) = x + 1000
+```
+
+For a detailed explanation of how Tim's trick works, see
+[Traits.jl: Dispatch on traits](https://github.com/mauro3/Traits.jl#dispatch-on-traits).
+The difference here is I make the methods containing the logic part of
+the same generic function (there it's in `_f`).
 
 # Base Traits
 
