@@ -122,7 +122,7 @@ expect:
 
 @traitimpl Tr2{Float16}
 fn(Float16(5)) # -> 4; dispatch through traits
-fn(Float32(5)) # -> MethodError; dispatch defined in previous example
+fn(Float32(5)) # -> MethodError; method defined in previous example
                #    was overwritten above
 ```
 This last definition of `fn` just overwrites the definition `@traitfn
@@ -132,6 +132,37 @@ warning though.
 If you need to dispatch on several traits in a single trait-method,
 then you're out of luck.  But please voice your grievance over in pull
 request [#2](https://github.com/mauro3/SimpleTraits.jl/pull/2).
+
+### Performance
+
+There is no performance impact compared to normal functions thanks to
+Julia's clever design. Continuing the example from above and looking
+at the native code
+```julia
+julia> @code_native fn(5)
+        .text
+Filename: REPL[3]
+        pushq   %rbp
+        movq    %rsp, %rbp
+Source line: 1
+        movl    $1, %eax
+        popq    %rbp
+        retq
+        nopl    (%rax,%rax)
+
+julia> @code_native fn(Float16(5))
+        .text
+Filename: SimpleTraits.jl
+        pushq   %rbp
+        movq    %rsp, %rbp
+Source line: 185
+        movl    $4, %eax
+        popq    %rbp
+        retq
+        nopl    (%rax,%rax)
+```
+shows that the normal method and the trait-method compile down to the
+same machine instructions.
 
 ## Advanced features
 
