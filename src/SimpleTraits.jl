@@ -1,3 +1,5 @@
+__precompile__()
+
 module SimpleTraits
 const curmod = module_name(current_module())
 
