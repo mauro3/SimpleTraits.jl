@@ -17,17 +17,16 @@ using Compat: view
 
 @test istrait(IsCallable{Function})
 
-if VERSION>v"0.4-" # use @generated functions
-    a = collect(1:5)
-    b = view(a, 2:3)
-    c = view(a, 1:2:5)
-    @test istrait(IsContiguous{typeof(b)})
-    @test !istrait(IsContiguous{typeof(c)})
+a = collect(1:5)
+b = view(a, 2:3)
+c = view(a, 1:2:5)
+@test istrait(IsContiguous{typeof(b)})
+@test !istrait(IsContiguous{typeof(c)})
 
-    @test istrait(IsFastLinearIndex{Vector})
-    @test !istrait(IsFastLinearIndex{AbstractArray})
+@test istrait(IsFastLinearIndex{Vector})
+@test !istrait(IsFastLinearIndex{AbstractArray})
 
-    if VERSION < v"0.5.0-dev"
-        @test istrait(IsCallable{Base.AddFun})
-    end
+if VERSION < v"0.5.0-dev"
+    # this give deprecation warning in Julia 0.5
+    @test istrait(IsCallable{Base.AddFun})
 end

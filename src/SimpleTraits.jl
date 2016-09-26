@@ -3,8 +3,6 @@ __precompile__()
 module SimpleTraits
 const curmod = module_name(current_module())
 
-using Compat
-
 # This is basically just adding a few convenience functions & macros
 # around Holy Traits.
 
