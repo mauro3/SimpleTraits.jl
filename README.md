@@ -206,6 +206,21 @@ end
 Note that these programmed-traits can be combined with `@traitimpl`,
 i.e. program the general case and add exceptions with `@traitimpl`.
 
+Trait-inheritance can also be hand-coded with above trick.  For
+instance, the trait given by (in pseudo syntax) `BeautyAndBeast{X,Y} <: IsNice{X},
+!IsNice{Y}, BelongTogether{X,Y}`:
+```julia
+@traitdef BeautyAndBeast{X,Y}
+@generated function SimpleTraits.trait{X,Y}(::Type{BeautyAndBeast{X,Y}})
+    if istrait(IsNice{X}) && !istrait(IsNice{Y}) && BelongTogether{X,Y}
+        :(BeautyAndBeast{X,Y})
+    else
+        :(Not{BeautyAndBeast{X,Y}})
+    end
+end
+```
+
+
 Note also that trait functions can be generated functions:
 ```julia
 @traitfn @generated fg{X; IsNice{X}}(x::X) = (println(x); :x)
