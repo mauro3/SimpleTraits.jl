@@ -2,6 +2,7 @@
 
 [![Build Status](https://travis-ci.org/mauro3/SimpleTraits.jl.svg?branch=master)](https://travis-ci.org/mauro3/SimpleTraits.jl)
 [![Build Status](https://ci.appveyor.com/api/projects/status/github/mauro3/SimpleTraits.jl?branch=master&svg=true)](https://ci.appveyor.com/project/mauro3/simpletraits-jl/branch/master)
+[NEWS](NEWS.md)
 
 This package provides a macro-based implementation of traits, using
 [Tim Holy's trait trick](https://github.com/JuliaLang/julia/issues/2345#issuecomment-54537633).
@@ -86,6 +87,19 @@ Similarly for `BelongTogether` which has two parameters:
 @traitfn f{X,Y; !BelongTogether{X,Y}}(x::X,y::Y) = "$x and $y cannot stand each other!"
 @test f(5, 5)=="5 and 5 cannot stand each other!"
 ```
+
+## [Traitor.jl](https://github.com/andyferris/Traitor.jl)-like syntax
+
+At JuliaCon 2016 folks suggested an alternate, more compact syntax for
+trait-functions using single parameter traits.  SimpleTraits now
+supports this.  Above function `f` can be written as:
+
+```julia
+@traitfn ft(x::::IsNice) = "Very nice!"
+@traitfn ft(x::::(!IsNice) = "Not so nice!"
+```
+Note that the parenthesis are needed with negated traits, otherwise a
+parser error is thrown.
 
 ## Details of method dispatch
 

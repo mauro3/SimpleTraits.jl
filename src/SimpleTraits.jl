@@ -1,6 +1,7 @@
 __precompile__()
 
 module SimpleTraits
+using MacroTools
 const curmod = module_name(current_module())
 
 # This is basically just adding a few convenience functions & macros
@@ -148,20 +149,73 @@ let dispatch_cache = Set()  # to ensure that the trait-dispatch function is defi
         else
             hasmac = false
         end
+
+        # Dissect AST into:
+        # fbody: body
+        # fname: symbol of name
+        # args0: vector of all arguments (without any Traitor stuff)
+        # args1: like args0 but with ::X -> gensym()::X
+        # typs: vector of all function parameters (without the trait-ones)
+        # trait: expression of the trait
+
         fhead = tfn.args[1]
         fbody = tfn.args[2]
-        fname = fhead.args[1].args[1]
-        args0 = fhead.args[2:end]  # version before adding gensyms
-        args = insertdummy(fhead.args[2:end])
-        typs = fhead.args[1].args[3:end]
-        trait_opposite = fhead.args[1].args[2].args[1]
-        trait = trait_opposite
+
+        fname, paras, args0 = @match fhead begin
+            f_{paras__}(args0__) => (f,paras,args0)
+            f_(args__)           => (f,[],args)
+        end
+        if length(paras)>0 && isa(paras[1],Expr) && paras[1].head==:parameters
+            # this is a Traits.jl style function
+            trait = paras[1].args[1]
+            typs = paras[2:end]
+        else
+            # This is a Traitor.jl style function.  Change it into a Traits.jl function.
+            # Find the traitor:
+            typs = paras
+            out = nothing
+            i = 0
+            vararg = false
+            for (i,a) in enumerate(args0)
+                vararg = a.head==:...
+                if vararg
+                    a = a.args[1]
+                end
+                out = @match a begin
+                    ::::Tr_           => (nothing,nothing,Tr)
+                    ::T_::Tr_         => (nothing,T,Tr)
+                    x_Symbol::::Tr_   => (x,nothing,Tr)
+                    x_Symbol::T_::Tr_ => (x,T,Tr)
+                end
+                out!=nothing && break
+            end
+            out==nothing && error("No trait found in function signature")
+            arg,typ,trait = out
+            if typ==nothing
+                typ = gensym()
+                push!(typs, typ)
+            end
+            if isnegated(trait)
+                trait = :(!($(trait.args[2]){$typ}))
+            else
+                trait = :($trait{$typ})
+            end
+            if vararg
+                args0[i] = arg==nothing ? :(::$typ...).args[1] : :($arg::$typ...).args[1]
+            else
+                args0[i] = arg==nothing ? :(::$typ) : :($arg::$typ)
+            end
+        end
+        args1 = insertdummy(args0)
+
+        # Process dissected AST
         if isnegated(trait)
+            trait_opposite = trait
             trait = trait.args[2]
             val = :(::Type{$curmod.Not{$trait}})
         else
             val = :(::Type{$trait})
-            trait_opposite = Expr(:call, :!, trait_opposite)  # generate the opposite
+            trait_opposite = Expr(:call, :!, trait)  # generate the opposite
         end
         # Get line info for better backtraces
         ln = findline(tfn)
@@ -169,20 +223,20 @@ let dispatch_cache = Set()  # to ensure that the trait-dispatch function is defi
             pushloc = Expr(:meta, :push_loc, ln.args[2], fname, ln.args[1])
             poploc = Expr(:meta, :pop_loc)
         else
-            pushloc = poploc = nothing
+           pushloc = poploc = nothing
         end
         retsym = gensym()
         if hasmac
-            fn = :(@dummy $fname{$(typs...)}($val, $(args...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
+            fn = :(@dummy $fname{$(typs...)}($val, $(args1...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
             fn.args[1] = mac # replace @dummy
         else
-            fn = :($fname{$(typs...)}($val, $(args...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
+            fn = :($fname{$(typs...)}($val, $(args1...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
         end
         ex = fn
         key = (current_module(), fname, typs, args0, trait_opposite)
         if !(key ∈ dispatch_cache)
             ex = quote
-                $fname{$(typs...)}($(args...)) = (Base.@_inline_meta(); $fname($curmod.trait($trait), $(strip_tpara(args)...)))
+                $fname{$(typs...)}($(args1...)) = (Base.@_inline_meta(); $fname($curmod.trait($trait), $(strip_tpara(args1)...)))
                 $ex
             end
             push!(dispatch_cache, key)
@@ -216,6 +270,7 @@ end
 
 # true if :(!(Tr{x}))
 isnegated(t::Expr) = t.head==:call
+isnegated(t::Symbol) = false
 
 # [:(x::X)] -> [:x]
 # also takes care of :...
@@ -252,6 +307,19 @@ Base.start(::GenerateTypeVars) = 1
 Base.next(::GenerateTypeVars{:upcase}, state) = (Symbol("X$state"), state+1) # X1,..
 Base.next(::GenerateTypeVars{:lcase}, state) = (Symbol("x$state"), state+1)  # x1,...
 Base.done(::GenerateTypeVars, state) = false
+
+# Get innermost symbols of nested curlies
+# :(A{BB, B{C{D}}}) -> [BB,D]
+innermosts(s::Symbol) = Symbol[s]
+function innermosts(ex::Expr)
+    @assert ex.head==:curly
+    out = Symbol[]
+    for p in ex.args[2:end]
+        append!(out, innermosts(p))
+    end
+    out
+end
+
 
 ####
 # Annotating the source location

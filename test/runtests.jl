@@ -48,11 +48,18 @@ trait = SimpleTraits.trait
 @test f(5)==1
 @test f(5.)==2
 
+@traitfn ft(x::::Tr1) = 1  # def 1
+@traitfn ft(x::::(!Tr1)) = 2
+@test ft(5)==1
+@test ft(5.)==2
+
+
 @traitfn f{X,Y; Tr2{X,Y}}(x::X,y::Y,z) = 1
 @test f(5,5., "a")==1
 @test_throws MethodError f(5,5, "a")==2
 @traitfn f{X,Y; !Tr2{X,Y}}(x::X,y::Y,z) = 2
 @test f(5,5, "a")==2
+# has not Traitor style syntax
 
 # This will overwrite the definition def1 above
 @traitfn f{X; !Tr2{X,X}}(x::X) = 10
@@ -69,8 +76,9 @@ trait = SimpleTraits.trait
 
 # VarArg
 @traitfn vara{X; Tr1{X}}(x::X, y...) = y
+@traitfn vara{X; !Tr1{X}}(x::X, y...) = x
 @test vara(5, 7, 8)==(7,8)
-# @test vara(5.0, 7, 8)==((7,8),) # hangs in lowering because of https://github.com/JuliaLang/julia/issues/13183
+@test vara(5.0, 7, 8)==5.0
 @traitfn vara2{X; Tr1{X}}(x::X...) = x
 @test vara2(5, 7, 8)==(5, 7, 8)
 @test_throws MethodError vara2(5, 7, 8.0)
@@ -78,6 +86,19 @@ trait = SimpleTraits.trait
 @traitfn vara3{X; Tr1{X}}(::X...) = X
 @test vara3(5, 7, 8)==Int
 @test_throws MethodError vara3(5, 7, 8.0)
+
+
+@traitfn varat(x::::Tr1, y...) = y
+@traitfn varat(x::::(!Tr1), y...) = x
+@test varat(5, 7, 8)==(7,8)
+@test varat(5.0, 7, 8)==5.0
+@traitfn vara2t(x::::Tr1...) = x
+@test vara2t(5, 7, 8)==(5, 7, 8)
+@test_throws MethodError vara2t(5, 7, 8.0)
+
+@traitfn vara3t{X}(::X::Tr1...) = X
+@test vara3t(5, 7, 8)==Int
+@test_throws MethodError vara3t(5, 7, 8.0)
 
 
 # with macro
@@ -88,13 +109,37 @@ trait = SimpleTraits.trait
 @traitimpl Tr1{AbstractArray}
 @test ggg([5])==[6]
 
+@traitfn @inbounds ggt(x::::Tr1) = x
+@test ggt(5)==5
+@traitfn @generated gggt{X}(x::X::Tr1) = X<:AbstractArray ? :(x+1) : :(x)
+@test gggt(5)==5
+@test gggt([5])==[6]
+
+
 # traitfn with Type
 @traitfn ggt{X; Tr1{X}}(::Type{X}, y) = (X,y)
 @test ggt(Array, 5)==(Array, 5)
+# no equivalent with Traitor syntax
 
 # traitfn with ::X
 @traitfn gg27{X; Tr1{X}}(::X) = X
 @test gg27([1])==Array{Int,1}
+
+@traitfn gg27t{X}(::X::Tr1) = X
+@test gg27t([1])==Array{Int,1}
+
+##
+@traitfn f11{T<:Number; Tr1{Dict{T}}}(x::Dict{T}) = 1
+@traitfn f11{T<:Number; !Tr1{Dict{T}}}(x::Dict{T}) = 2
+@traitimpl Tr1{Dict{Int}}
+@test f11(Dict(1=>1))==1
+@test f11(Dict(5.5=>1))==2
+
+@traitfn f11t{T<:Number}(x::Dict{T}::Tr1) = 1
+@traitfn f11t{T<:Number}(x::Dict{T}::(!Tr1)) = 2
+@test f11t(Dict(1=>1))==1
+@test f11t(Dict(5.5=>1))==2
+
 
 
 ######
