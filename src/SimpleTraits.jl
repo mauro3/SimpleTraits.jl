@@ -308,19 +308,6 @@ Base.next(::GenerateTypeVars{:upcase}, state) = (Symbol("X$state"), state+1) # X
 Base.next(::GenerateTypeVars{:lcase}, state) = (Symbol("x$state"), state+1)  # x1,...
 Base.done(::GenerateTypeVars, state) = false
 
-# Get innermost symbols of nested curlies
-# :(A{BB, B{C{D}}}) -> [BB,D]
-innermosts(s::Symbol) = Symbol[s]
-function innermosts(ex::Expr)
-    @assert ex.head==:curly
-    out = Symbol[]
-    for p in ex.args[2:end]
-        append!(out, innermosts(p))
-    end
-    out
-end
-
-
 ####
 # Annotating the source location
 ####

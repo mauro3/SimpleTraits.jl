@@ -91,12 +91,12 @@ Similarly for `BelongTogether` which has two parameters:
 ## [Traitor.jl](https://github.com/andyferris/Traitor.jl)-like syntax
 
 At JuliaCon 2016 folks suggested an alternate, more compact syntax for
-trait-functions using single parameter traits.  SimpleTraits now
-supports this.  Above function `f` can be written as:
+trait-functions.  However, it only works for single parameter traits.
+SimpleTraits now supports this.  Above function `f` can be written as:
 
 ```julia
 @traitfn ft(x::::IsNice) = "Very nice!"
-@traitfn ft(x::::(!IsNice) = "Not so nice!"
+@traitfn ft(x::::(!IsNice)) = "Not so nice!"
 ```
 Note that the parenthesis are needed with negated traits, otherwise a
 parser error is thrown.
