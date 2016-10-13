@@ -42,7 +42,10 @@ trait = SimpleTraits.trait
 @test trait(Tr2{Int, Float64})==Tr2{Int, Float64}
 @test trait(Tr2{Int, Float32})==Not{Tr2{Int, Float32}}
 
-# trait functions
+#################
+# Trait functions
+#################
+# functions with `t` postfix are the same as previous ones but using Traitor syntax
 @traitfn f{X; Tr1{X}}(x::X) = 1  # def 1
 @traitfn f{X; !Tr1{X}}(x::X) = 2
 @test f(5)==1
@@ -59,9 +62,11 @@ trait = SimpleTraits.trait
 @test_throws MethodError f(5,5, "a")==2
 @traitfn f{X,Y; !Tr2{X,Y}}(x::X,y::Y,z) = 2
 @test f(5,5, "a")==2
-# has not Traitor style syntax
+# Note, two argument traits have no Traitor style syntax
 
 # This will overwrite the definition def1 above
+
+VERSION>=v"0.5" && println("\nOne warning expected:")
 @traitfn f{X; !Tr2{X,X}}(x::X) = 10
 @traitfn f{X; Tr2{X,X}}(x::X) = 100
 @test f(5)==10
@@ -69,8 +74,10 @@ trait = SimpleTraits.trait
 @traitimpl Tr2{Integer, Integer}
 @test f(5.)==10
 @test !(f(5)==100)
-# need to update method cache:
+# needed to update method cache:
+VERSION>=v"0.5" && println("\nTwo warnings expected:")
 @traitfn f{X; Tr2{X,X}}(x::X) = 100
+println("")
 @test f(5)==100
 @test f(5.)==10
 
@@ -129,7 +136,7 @@ trait = SimpleTraits.trait
 @test gg27t([1])==Array{Int,1}
 
 ##
-@traitfn f11{T<:Number; Tr1{Dict{T}}}(x::Dict{T}) = 1
+@traitfn f11{T<:Number;  Tr1{Dict{T}}}(x::Dict{T}) = 1
 @traitfn f11{T<:Number; !Tr1{Dict{T}}}(x::Dict{T}) = 2
 @traitimpl Tr1{Dict{Int}}
 @test f11(Dict(1=>1))==1
@@ -140,7 +147,11 @@ trait = SimpleTraits.trait
 @test f11t(Dict(1=>1))==1
 @test f11t(Dict(5.5=>1))==2
 
-
+##
+@traitfn f12t(::::Tr1) = 1
+@traitfn f12t(::::(!Tr1)) = 2
+@test f12t(1)==1
+@test f12t(5.5)==2
 
 ######
 # Other tests

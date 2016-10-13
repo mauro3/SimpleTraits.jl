@@ -101,7 +101,21 @@ SimpleTraits now supports this.  Above function `f` can be written as:
 Note that the parenthesis are needed with negated traits, otherwise a
 parser error is thrown.
 
-## Details of method dispatch
+## Method overwritten warnings
+
+As of Julia 0.5 warnings are issued when methods are overwritten.  Due
+to Tim's trick the `@traitfn` needs to create two functions the first
+time it is used for a particular method (see next section for an
+explanation).  But when defining the opposite trait, then better only
+one method is created or else the warning appears.  Some heuristics to
+avoid the warnings are in-place to check whether a method is defined
+yet or not but they fail at times (see issue
+[#7](https://github.com/mauro3/SimpleTraits.jl/issues/7)).  Long story
+short: define the two methods of a trait and its negation using the
+same argument names and no warning should be issued.  Although note
+that the warnings are harmless.
+
+# Details of method dispatch
 
 Defining a trait function adds: one new method (or overwrites one) to
 the generic function, which contains the logic; and one helper

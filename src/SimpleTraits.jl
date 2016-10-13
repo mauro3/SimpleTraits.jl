@@ -153,10 +153,14 @@ let dispatch_cache = Set()  # to ensure that the trait-dispatch function is defi
         # Dissect AST into:
         # fbody: body
         # fname: symbol of name
-        # args0: vector of all arguments (without any Traitor stuff)
-        # args1: like args0 but with ::X -> gensym()::X
-        # typs: vector of all function parameters (without the trait-ones)
+        # args0: vector of all arguments (without any gensym'ed symbols but stripped of Traitor-traits)
+        # args1: like args0 but with gensym'ed symbols were necessary
+        # typs0: vector of all function parameters (without the trait-ones, no gensym'ed)
+        # typs: vector of all function parameters (without the trait-ones, with gensym'ed for Traitor)
         # trait: expression of the trait
+        # trait0: expression of the trait without any gensym'ed symbols
+        #
+        # (The variables without gensym'ed symbols are mostly used for the key of the dispatch cache)
 
         fhead = tfn.args[1]
         fbody = tfn.args[2]
@@ -168,10 +172,14 @@ let dispatch_cache = Set()  # to ensure that the trait-dispatch function is defi
         if length(paras)>0 && isa(paras[1],Expr) && paras[1].head==:parameters
             # this is a Traits.jl style function
             trait = paras[1].args[1]
+            trait0 = trait # without gensym'ed types, here identical
             typs = paras[2:end]
+            typs0 = typs # without gensym'ed types, here identical
+            args1 = insertdummy(args0)
         else
             # This is a Traitor.jl style function.  Change it into a Traits.jl function.
             # Find the traitor:
+            typs0 = deepcopy(paras) # without gensym'ed types
             typs = paras
             out = nothing
             i = 0
@@ -190,32 +198,36 @@ let dispatch_cache = Set()  # to ensure that the trait-dispatch function is defi
                 out!=nothing && break
             end
             out==nothing && error("No trait found in function signature")
-            arg,typ,trait = out
+            arg,typ,trait0 = out
             if typ==nothing
                 typ = gensym()
                 push!(typs, typ)
             end
-            if isnegated(trait)
-                trait = :(!($(trait.args[2]){$typ}))
+            if isnegated(trait0)
+                trait = :(!($(trait0.args[2]){$typ}))
             else
-                trait = :($trait{$typ})
+                trait = :($trait0{$typ})
             end
+            args1 = deepcopy(args0)
             if vararg
-                args0[i] = arg==nothing ? :(::$typ...).args[1] : :($arg::$typ...).args[1]
+                args0[i] = arg==nothing ? nothing : :($arg...).args[1]
+                args1[i] = arg==nothing ? :(::$typ...).args[1] : :($arg::$typ...).args[1]
             else
-                args0[i] = arg==nothing ? :(::$typ) : :($arg::$typ)
+                args0[i] = arg==nothing ? nothing : :($arg)
+                args1[i] = arg==nothing ? :(::$typ) : :($arg::$typ)
             end
+            args1 = insertdummy(args1)
+
         end
-        args1 = insertdummy(args0)
 
         # Process dissected AST
         if isnegated(trait)
-            trait_opposite = trait
+            trait0_opposite = trait0 # opposite of `trait` below as that gets stripped of !
             trait = trait.args[2]
             val = :(::Type{$curmod.Not{$trait}})
         else
+            trait0_opposite = Expr(:call, :!, trait0)  # generate the opposite
             val = :(::Type{$trait})
-            trait_opposite = Expr(:call, :!, trait)  # generate the opposite
         end
         # Get line info for better backtraces
         ln = findline(tfn)
@@ -233,7 +245,7 @@ let dispatch_cache = Set()  # to ensure that the trait-dispatch function is defi
             fn = :($fname{$(typs...)}($val, $(args1...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
         end
         ex = fn
-        key = (current_module(), fname, typs, args0, trait_opposite)
+        key = (current_module(), fname, typs0, args0, trait0_opposite)
         if !(key ∈ dispatch_cache)
             ex = quote
                 $fname{$(typs...)}($(args1...)) = (Base.@_inline_meta(); $fname($curmod.trait($trait), $(strip_tpara(args1)...)))
