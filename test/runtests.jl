@@ -42,6 +42,18 @@ trait = SimpleTraits.trait
 @test trait(Tr2{Int, Float64})==Tr2{Int, Float64}
 @test trait(Tr2{Int, Float32})==Not{Tr2{Int, Float32}}
 
+# issue 9
+abstract A9
+type B9<:A9 end
+type C9<:A9 end
+@traitdef Tr9{X}
+@traitimpl Tr9{A9}
+@traitimpl Not{Tr9{B9}}
+@traitimpl !Tr9{C9}
+@test istrait(Tr9{A9})==true
+@test istrait(Tr9{B9})==false
+@test istrait(Tr9{C9})==false
+
 #################
 # Trait functions
 #################

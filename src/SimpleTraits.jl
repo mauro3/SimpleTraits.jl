@@ -114,6 +114,12 @@ Example:
 macro traitimpl(tr)
     # makes
     # trait{X1<:Int,X2<:Float64}(::Type{Tr1{X1,X2}}) = Tr1{X1,X2}
+    if tr.args[1]==:Not || isnegated(tr)
+        tr = tr.args[2]
+        negated = true
+    else
+        negated = false
+    end
     typs = tr.args[2:end]
     trname = esc(tr.args[1])
     curly = Any[]
@@ -125,10 +131,18 @@ macro traitimpl(tr)
     arg = :(::Type{$trname{$(paras...)}})
     fnhead = :($curmod.trait{$(curly...)}($arg))
     isfnhead = :($curmod.istrait{$(curly...)}($arg))
-    quote
-        $fnhead = $trname{$(paras...)}
-        $isfnhead = true # Add the istrait definition as otherwise
-                         # method-caching can be an issue.
+    if !negated
+        return quote
+            $fnhead = $trname{$(paras...)}
+            $isfnhead = true # Add the istrait definition as otherwise
+                             # method-caching can be an issue.
+        end
+    else
+        return quote
+            $fnhead = Not{$trname{$(paras...)}}
+            $isfnhead = false# Add the istrait definition as otherwise
+                             # method-caching can be an issue.
+        end
     end
 end
 
