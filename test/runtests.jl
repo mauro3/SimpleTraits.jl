@@ -165,6 +165,36 @@ println("")
 @test f12t(1)==1
 @test f12t(5.5)==2
 
+####
+# Trait inheritiance
+###
+@traitdef TI1{X}
+@test supertraits(TI1)==Tuple{}
+@test supertraits(TI1{Int})==Tuple{}
+@traitdef TI2{X,Y}
+@test supertraits(TI2)==Tuple{}
+@traitdef TI_12{X,Y} <: TI1{X}, TI1{Y}, TI2{X,Y}
+@test supertraits(TI_12{Int,Float64})==Tuple{TI1{Int}, TI1{Float64}, TI2{Int,Float64} }
+@test !istrait(TI_12{Int,Float64})
+
+@test_throws ErrorException @traitimpl TI_12{Int,Float64}
+
+@traitimpl TI1{Int}
+@traitimpl TI1{Float64}
+@traitimpl TI2{Int,Float64}
+@traitimpl TI_12{Int,Float64}
+
+@test istrait(TI_12{Int,Float64})
+
+
+######
+# brocken
+######
+
+@traitimpl TI2{Dict}
+@test_broken !istrait(TI2{Dict})
+# ideally an error should be thrown if tr in trait(tr) in not leaftype.
+
 ######
 # Other tests
 #####

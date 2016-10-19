@@ -7,7 +7,7 @@ const curmod = module_name(current_module())
 # This is basically just adding a few convenience functions & macros
 # around Holy Traits.
 
-export Trait, istrait, @traitdef, @traitimpl, @traitfn, Not
+export Trait, istrait, supertraits, @traitdef, @traitimpl, @traitfn, Not
 
 # All traits are concrete subtypes of this trait.  SUPER is not used
 # but present to be compatible with Traits.jl.
@@ -24,16 +24,19 @@ immutable Tr1{X,Y} <: Trait end
 where X and Y are the types involved in the trait.
 
 
-(SUPER is not used here but in Traits.jl, thus retained for possible
-future compatibility.)
+The type parameter SUPER of Trait is needed to specify super-traits (a
+tuple).
 """
 abstract Trait{SUPER}
+
+"Return super-traits"
+supertraits{T<:Trait}(t::Type{T}) =  t.super.parameters[1]
 
 """
 The set of all types not belonging to a trait is encoded by wrapping
 it with Not{}, e.g.  Not{Tr1{X,Y}}
 """
-abstract Not{T<:Trait} <: Trait
+immutable Not{T<:Trait} <: Trait end
 
 # Helper to strip an even number of Not{}s off: Not{Not{T}}->T
 stripNot{T<:Trait}(::Type{T}) = T
@@ -41,9 +44,15 @@ stripNot{T<:Trait}(::Type{Not{T}}) = Not{T}
 stripNot{T<:Trait}(::Type{Not{Not{T}}}) = stripNot(T)
 
 """
+This is the function used to do the trait-dispatch.  Note that
+anything but a constant method will probably not be inlined away by
+the JIT and will lead to slower dynamic dispatch.
+
 A trait is defined as full-filled if this function is the identity
 function for that trait.  Otherwise it returns the trait wrapped in
-`Not`.
+`Not`.  Note that *no super-trait checking* is done when this function
+is called.  Thus, if appropriate, before this function is defined for
+a trait a check that its super-traits are defined should be done.
 
 Example:
 ```
@@ -70,35 +79,61 @@ trait{T<:Trait}(::Type{Not{T}}) = trait(T)
 
 """
 This function checks whether a trait is fulfilled by a specific
-set of types.
+set of types:
 ```
 istrait(Tr1{Int,Float64}) => return true or false
 ```
+
+or that all traits of a Tuple of traits are fulfilled
+```
+istrait( Tuple{Tr1{Int,Float64}, Tr2{Int}} ) => return true or false
+```
 """
 istrait(::Any) = error("Argument is not a Trait.")
-istrait{T<:Trait}(tr::Type{T}) = trait(tr)==stripNot(tr) ? true : false # Problem, this can run into issue #265
+function istrait{T<:Trait}(tr::Type{T})
+    !isleaftype(tr) && error("Not all parameters of $tr are specified, thus not a valid trait.")
+    trait(tr)==stripNot(tr) ? true : false # Problem, this can run into issue #265
+end
                                                                         # thus is redefine when traits are defined
+istrait{T<:Tuple}(tr::Type{T}) = mapreduce(istrait, &, true, tr.parameters)
+
 """
 
-Used to define a trait.  Traits, like types, are camel cased.  I
-suggest to start them with a verb, e.g. `IsImmutable`, to distinguish
-them from actual types, which are usually nouns.
+Defines a trait.  Traits need to have one or more (type-)parameters to
+specify the type to which the trait is applied.  For instance
+`IsImmutable{Int}` signifies that `Int` is part of `IsImmutable`
+(although whether that is true needs to be checked with the `istrait`
+function).  Most traits will be one-parameter traits, however, several
+parameters are useful when there is a "contract" between several
+types.
 
-Traits need to have one or more (type-)parameters to specify the type
-to which the trait is applied.  For instance `IsImmutable{Int}`
-signifies that `Int` is part of `IsImmutable` (although whether that
-is true needs to be checked with the `istrait` function).  Most traits
-will be one-parameter traits, however, several parameters are useful
-when there is a "contract" between several types.
+Traits can be sub-traits of one or several other traits.  A trait is
+then fulfilled if it is fulfilled itself and all its super-traits are
+also fulfilled.
+
+Traits, like types, are camel cased.  I suggest to start them with a
+verb, e.g. `IsImmutable`, to distinguish them from actual types, which
+are usually nouns.
+
 
 Examples:
 ```julia
 @traitdef IsFast{X}
-@traitdef IsSlow{X,Y}
+@traitdef IsSuperFast{X} <: IsFast{X}
+@traitdef IsHyper{X}
+@traitdef IsHyperFast{X} <: IsSuperFast{X}, IsHyper{X}
 ```
 """
 macro traitdef(tr)
-    :(immutable $(esc(tr)) <: Trait end)
+    Tr, Pr, SUPER = @match tr begin
+        Tr_{Pr__} <: SUPER__ => (Tr, Pr, SUPER)
+        Tr_{Pr__} <: SUPER1_,SUPER__ => (Tr, Pr, [SUPER1, SUPER...])
+        Tr_{Pr__} => (Tr, Pr, [])
+    end
+    tmp = :(Tuple{})
+    append!(tmp.args, SUPER)
+    T = esc(:($Tr{$(Pr...)}))
+    :(immutable $T <: Trait{$(esc(tmp))} end)
 end
 
 """
@@ -112,8 +147,10 @@ Example:
 ```
 """
 macro traitimpl(tr)
-    # makes
+    # makes from @traitimpl Tr1{Int,Float64}
+    # istrait(supertrait(Tr1{Int,Float64})) || error("...")
     # trait{X1<:Int,X2<:Float64}(::Type{Tr1{X1,X2}}) = Tr1{X1,X2}
+    # istrait{X1<:Int,X2<:Float64}(::Type{Tr1{X1,X2}}) = true
     if tr.args[1]==:Not || isnegated(tr)
         tr = tr.args[2]
         negated = true
@@ -129,17 +166,21 @@ macro traitimpl(tr)
         push!(paras, esc(v))
     end
     arg = :(::Type{$trname{$(paras...)}})
-    fnhead = :($curmod.trait{$(curly...)}($arg))
-    isfnhead = :($curmod.istrait{$(curly...)}($arg))
+    fnhead = :(trait{$(curly...)}($arg))
+    isfnhead = :(istrait{$(curly...)}($arg))
+    trr = :($trname{$(paras...)})
+    errstr = :("Not all super-traits of $($(esc(tr))) fulfilled")
     if !negated
         return quote
-            $fnhead = $trname{$(paras...)}
+            !istrait(supertraits($(esc(tr)))) && error($errstr)
+            $fnhead = $trr
             $isfnhead = true # Add the istrait definition as otherwise
                              # method-caching can be an issue.
         end
     else
         return quote
-            $fnhead = Not{$trname{$(paras...)}}
+            !istrait(supertraits($(esc(tr)))) && error($errstr)
+            $fnhead = Not{$trr}
             $isfnhead = false# Add the istrait definition as otherwise
                              # method-caching can be an issue.
         end
