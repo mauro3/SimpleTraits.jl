@@ -1,12 +1,13 @@
 module BaseTraits
 using SimpleTraits
+import SimpleTraits: trait
 
 export IsLeafType, IsBits, IsImmutable, IsContiguous, IsFastLinearIndex,
        IsAnything, IsNothing, IsCallable
 
 "Trait which contains all types"
 @traitdef IsAnything{X}
-SimpleTraits.trait{X}(::Type{IsAnything{X}}) = IsAnything{X}
+trait{X}(::Type{IsAnything{X}}) = IsAnything{X}
 
 "Trait which contains no types"
 typealias IsNothing{X} Not{IsAnything{X}}
@@ -14,17 +15,17 @@ typealias IsNothing{X} Not{IsAnything{X}}
 
 "Trait of all isbits-types"
 @traitdef IsBits{X}
-@generated SimpleTraits.trait{X}(::Type{IsBits{X}}) =
+@generated trait{X}(::Type{IsBits{X}}) =
     isbits(X) ? :(IsBits{X}) : :(Not{IsBits{X}})
 
 "Trait of all immutable types"
 @traitdef IsImmutable{X}
-@generated SimpleTraits.trait{X}(::Type{IsImmutable{X}}) =
+@generated trait{X}(::Type{IsImmutable{X}}) =
     X.mutable ? :(Not{IsImmutable{X}}) : :(IsImmutable{X})
 
 "Trait of all callable objects"
 @traitdef IsCallable{X}
-@generated SimpleTraits.trait{X}(::Type{IsCallable{X}}) =
+@generated trait{X}(::Type{IsCallable{X}}) =
     (X==Function ||  length(methods(call, (X,Vararg)))>0) ? IsCallable{X} : Not{IsCallable{X}}
 
 "Trait of all leaf types types"
@@ -33,12 +34,12 @@ typealias IsNothing{X} Not{IsAnything{X}}
 
 "Types which have contiguous memory layout"
 @traitdef IsContiguous{X} # https://github.com/JuliaLang/julia/issues/10889
-@generated SimpleTraits.trait{X}(::Type{IsContiguous{X}}) =
+@generated trait{X}(::Type{IsContiguous{X}}) =
     Base.iscontiguous(X) ? :(IsContiguous{X}) : :(Not{IsContiguous{X}})
 
 "Array indexing trait."
 @traitdef IsFastLinearIndex{X} # https://github.com/JuliaLang/julia/pull/8432
-@generated function SimpleTraits.trait{X}(::Type{IsFastLinearIndex{X}})
+@generated function trait{X}(::Type{IsFastLinearIndex{X}})
     if Base.linearindexing(X)==Base.LinearFast()
         return :(IsFastLinearIndex{X})
     elseif  Base.linearindexing(X)==Base.LinearSlow()
