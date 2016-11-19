@@ -54,6 +54,8 @@ type C9<:A9 end
 @test istrait(Tr9{B9})==false
 @test istrait(Tr9{C9})==false
 
+# issue #15 is tested through the base-traits.jl tests.
+
 #################
 # Trait functions
 #################
