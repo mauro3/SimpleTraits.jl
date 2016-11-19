@@ -6,7 +6,7 @@ export IsLeafType, IsBits, IsImmutable, IsContiguous, IsFastLinearIndex,
 
 "Trait which contains all types"
 @traitdef IsAnything{X}
-SimpleTraits.trait{X}(::Type{IsAnything{X}}) = IsAnything{X}
+@traitimpl IsAnything{X} <- (x->true)(X)
 
 "Trait which contains no types"
 typealias IsNothing{X} Not{IsAnything{X}}
@@ -14,39 +14,36 @@ typealias IsNothing{X} Not{IsAnything{X}}
 
 "Trait of all isbits-types"
 @traitdef IsBits{X}
-@generated SimpleTraits.trait{X}(::Type{IsBits{X}}) =
-    isbits(X) ? :(IsBits{X}) : :(Not{IsBits{X}})
+@traitimpl IsBits{X} <- isbits(X)
 
 "Trait of all immutable types"
 @traitdef IsImmutable{X}
-@generated SimpleTraits.trait{X}(::Type{IsImmutable{X}}) =
-    X.mutable ? :(Not{IsImmutable{X}}) : :(IsImmutable{X})
+@traitimpl IsImmutable{X}  <- (X->!X.mutable)(X)
 
 "Trait of all callable objects"
 @traitdef IsCallable{X}
-@generated SimpleTraits.trait{X}(::Type{IsCallable{X}}) =
-    (X==Function ||  length(methods(call, (X,Vararg)))>0) ? IsCallable{X} : Not{IsCallable{X}}
+@traitimpl IsCallable{X} <- (X->(X==Function ||  length(methods(call, (X,Vararg)))>0))(X)
 
 "Trait of all leaf types types"
 @traitdef IsLeafType{X}
-@generated trait{X}(::Type{IsLeafType{X}}) = isleaftype(X) ? :(Not{IsLeafType{X}}) : :(IsLeafType{X})
+@traitimpl IsLeafType{X} <- isleaftype(X)
 
 "Types which have contiguous memory layout"
 @traitdef IsContiguous{X} # https://github.com/JuliaLang/julia/issues/10889
-@generated SimpleTraits.trait{X}(::Type{IsContiguous{X}}) =
-    Base.iscontiguous(X) ? :(IsContiguous{X}) : :(Not{IsContiguous{X}})
+@traitimpl IsContiguous{X} <- Base.iscontiguous(X)
 
 "Array indexing trait."
 @traitdef IsFastLinearIndex{X} # https://github.com/JuliaLang/julia/pull/8432
-@generated function SimpleTraits.trait{X}(::Type{IsFastLinearIndex{X}})
+function islinearfast(X)
     if Base.linearindexing(X)==Base.LinearFast()
-        return :(IsFastLinearIndex{X})
+        return true
     elseif  Base.linearindexing(X)==Base.LinearSlow()
-        return :(Not{IsFastLinearIndex{X}})
+        return false
     else
         error("Not recognized")
     end
 end
+@traitimpl IsFastLinearIndex{X} <- islinearfast(X)
 
 # TODO
 ## @traitdef IsArray{X} # use for any array like type in the sense of container
