@@ -110,39 +110,80 @@ Example:
 @traitdef IsFast{X}
 @traitimpl IsFast{Array{Int,1}}
 ```
+
+Often a trait is dependent on some check-function returning true or
+false.  This can be done with:
+```julia
+@traitimpl IsFast{T} <- isfast(T)
+```
+where `isfast` is that check-function.  This generates a `@generated
+function under the hood.
+
+Note that traits implemented with the former of above methods will
+override an implementation with the latter method.  Thus it can be
+used to define exceptions to the rule.
 """
 macro traitimpl(tr)
-    # makes
-    # trait{X1<:Int,X2<:Float64}(::Type{Tr1{X1,X2}}) = Tr1{X1,X2}
-    if tr.args[1]==:Not || isnegated(tr)
-        tr = tr.args[2]
-        negated = true
-    else
-        negated = false
-    end
-    typs = tr.args[2:end]
-    trname = esc(tr.args[1])
-    curly = Any[]
-    paras = Any[]
-    for (ty,v) in zip(typs, GenerateTypeVars{:upcase}())
-        push!(curly, Expr(:(<:), esc(v), esc(ty)))  #:($v<:$ty)
-        push!(paras, esc(v))
-    end
-    arg = :(::Type{$trname{$(paras...)}})
-    fnhead = :($curmod.trait{$(curly...)}($arg))
-    isfnhead = :($curmod.istrait{$(curly...)}($arg))
-    if !negated
-        return quote
-            $fnhead = $trname{$(paras...)}
-            $isfnhead = true # Add the istrait definition as otherwise
-                             # method-caching can be an issue.
+    if tr.head==:curly || (tr.head==:call && tr.args[1]==:!)
+        # makes
+        # trait{X1<:Int,X2<:Float64}(::Type{Tr1{X1,X2}}) = Tr1{X1,X2}
+        if tr.args[1]==:Not || isnegated(tr)
+            tr = tr.args[2]
+            negated = true
+        else
+            negated = false
+        end
+        typs = tr.args[2:end]
+        trname = esc(tr.args[1])
+        curly = Any[]
+        paras = Any[]
+        for (ty,v) in zip(typs, GenerateTypeVars{:upcase}())
+            push!(curly, Expr(:(<:), esc(v), esc(ty)))  #:($v<:$ty)
+            push!(paras, esc(v))
+        end
+        arg = :(::Type{$trname{$(paras...)}})
+        fnhead = :($curmod.trait{$(curly...)}($arg))
+        isfnhead = :($curmod.istrait{$(curly...)}($arg))
+        if !negated
+            return quote
+                $fnhead = $trname{$(paras...)}
+                $isfnhead = true # Add the istrait definition as otherwise
+                # method-caching can be an issue.
+            end
+        else
+            return quote
+                $fnhead = Not{$trname{$(paras...)}}
+                $isfnhead = false# Add the istrait definition as otherwise
+                # method-caching can be an issue.
+            end
+        end
+    elseif tr.head==:call
+        @assert tr.args[1]==:<
+        negated,Tr,P1,fn,P2 = @match tr begin
+            Not{Tr_{P1__}} <- fn_(P2__) => (true, Tr, P1, fn, P2)
+            Tr_{P1__} <- fn_(P2__) => (false, Tr, P1, fn, P2)
+        end
+        if negated
+            return esc(
+                quote
+                @generated function SimpleTraits.trait{$(P1...)}(::Type{$Tr{$(P1...)}})
+                    Tr = $Tr
+                    P1 = $P1
+                    return $fn($(P2...)) ? :(Not{$Tr{$(P1...)}}) : :($Tr{$(P1...)})
+                end
+            end)
+        else
+            return esc(
+                quote
+                @generated function SimpleTraits.trait{$(P1...)}(::Type{$Tr{$(P1...)}})
+                    Tr = $Tr
+                    P1 = $P1
+                    return $fn($(P2...)) ? :($Tr{$(P1...)}) : :(Not{$Tr{$(P1...)}})
+                end
+            end)
         end
     else
-        return quote
-            $fnhead = Not{$trname{$(paras...)}}
-            $isfnhead = false# Add the istrait definition as otherwise
-                             # method-caching can be an issue.
-        end
+        error("Cannot parse $tr")
     end
 end
 
