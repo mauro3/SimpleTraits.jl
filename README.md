@@ -54,6 +54,17 @@ Add types to a trait-group with `@traitimpl`:
 @traitimpl IsNice{Int}
 @traitimpl BelongTogether{Int,String}
 ```
+If there is a function which tests whether a trait is fulfilled then
+it can be used like so:
+```julia
+@traitimpl IsNice{X} <- isnice(X)
+```
+i.e. any type `X` for which `isnice(X)==true` belongs to `IsNice`.
+Note that this generates a generated-function under the hood and thus
+[restrictions](http://docs.julialang.org/en/release-0.5/manual/metaprogramming/#generated-functions)
+on `isnice` apply.  Last note that in above example the `@traitimpl IsNice{Int}` "wins"
+over the `@traitimpl IsNice{X} <- isnice(X)`, thus
+this can be used to define exceptions to a rule.
 
 It can be checked whether a type belongs to a trait with `istrait`:
 ```julia
