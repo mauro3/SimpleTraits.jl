@@ -27,7 +27,7 @@ where X and Y are the types involved in the trait.
 (SUPER is not used here but in Traits.jl, thus retained for possible
 future compatibility.)
 """
-abstract Trait{SUPER}
+abstract Trait #{SUPER}
 
 """
 The set of all types not belonging to a trait is encoded by wrapping
