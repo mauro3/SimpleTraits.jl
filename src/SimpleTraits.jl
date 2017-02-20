@@ -2,6 +2,7 @@ __precompile__()
 
 module SimpleTraits
 using MacroTools
+using Compat
 const curmod = module_name(current_module())
 
 # This is basically just adding a few convenience functions & macros
@@ -13,6 +14,8 @@ export Trait, istrait, @traitdef, @traitimpl, @traitfn, Not
 # but present to be compatible with Traits.jl.
 ## @doc """
 ## `abstract Trait{SUPER}`
+
+@compat abstract type Trait end #{SUPER}
 
 """
 All Traits are subtypes of abstract type Trait.
@@ -27,13 +30,15 @@ where X and Y are the types involved in the trait.
 (SUPER is not used here but in Traits.jl, thus retained for possible
 future compatibility.)
 """
-abstract Trait #{SUPER}
+Trait
+
+@compat abstract type Not{T<:Trait} <: Trait end
 
 """
 The set of all types not belonging to a trait is encoded by wrapping
 it with Not{}, e.g.  Not{Tr1{X,Y}}
 """
-abstract Not{T<:Trait} <: Trait
+Not
 
 # Helper to strip an even number of Not{}s off: Not{Not{T}}->T
 stripNot{T<:Trait}(::Type{T}) = T
