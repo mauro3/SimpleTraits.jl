@@ -1,4 +1,5 @@
 using SimpleTraits
+using Compat
 using Base.Test
 
 const trait = SimpleTraits.trait
@@ -43,7 +44,7 @@ const trait = SimpleTraits.trait
 @test trait(Tr2{Int, Float32})==Not{Tr2{Int, Float32}}
 
 # issue 9
-abstract A9
+@compat abstract type A9 end
 type B9<:A9 end
 type C9<:A9 end
 @traitdef Tr9{X}

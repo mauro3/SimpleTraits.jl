@@ -1,7 +1,9 @@
 module BaseTraits
 using SimpleTraits
 
-export IsLeafType, IsBits, IsImmutable, IsContiguous, IsFastLinearIndex,
+using Compat
+
+export IsLeafType, IsBits, IsImmutable, IsContiguous, IsIndexLinear,
        IsAnything, IsNothing, IsCallable
 
 "Trait which contains all types"
@@ -9,7 +11,7 @@ export IsLeafType, IsBits, IsImmutable, IsContiguous, IsFastLinearIndex,
 @traitimpl IsAnything{X} <- (x->true)(X)
 
 "Trait which contains no types"
-typealias IsNothing{X} Not{IsAnything{X}}
+@compat const IsNothing{X} = Not{IsAnything{X}}
 
 
 "Trait of all isbits-types"
@@ -33,17 +35,17 @@ typealias IsNothing{X} Not{IsAnything{X}}
 @traitimpl IsContiguous{X} <- Base.iscontiguous(X)
 
 "Array indexing trait."
-@traitdef IsFastLinearIndex{X} # https://github.com/JuliaLang/julia/pull/8432
-function islinearfast(X)
-    if Base.linearindexing(X)==Base.LinearFast()
+@traitdef IsIndexLinear{X} # https://github.com/JuliaLang/julia/pull/8432
+function isindexlinear(X)
+    if IndexStyle(X)==IndexLinear()
         return true
-    elseif  Base.linearindexing(X)==Base.LinearSlow()
+    elseif  IndexStyle(X)==IndexCartesian()
         return false
     else
         error("Not recognized")
     end
 end
-@traitimpl IsFastLinearIndex{X} <- islinearfast(X)
+@traitimpl IsIndexLinear{X} <- isindexlinear(X)
 
 # TODO
 ## @traitdef IsArray{X} # use for any array like type in the sense of container
@@ -51,5 +53,8 @@ end
 
 ## @traitdef IsMartix{X} # use for any LinearOperator
 ##                    # types<:AbstractArray are automatically part
+
+
+Base.@deprecate_binding IsFastLinearIndex IsIndexLinear
 
 end # module
