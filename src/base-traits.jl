@@ -4,7 +4,7 @@ using SimpleTraits
 using Compat
 
 export IsLeafType, IsBits, IsImmutable, IsContiguous, IsIndexLinear,
-       IsAnything, IsNothing, IsCallable
+       IsAnything, IsNothing, IsCallable, IsIterable
 
 "Trait which contains all types"
 @traitdef IsAnything{X}
@@ -56,5 +56,11 @@ end
 
 
 Base.@deprecate_binding IsFastLinearIndex IsIndexLinear
+
+"Trait of all iterable types"
+@traitdef IsIterable{X}
+@generated function SimpleTraits.trait{X}(::Type{IsIterable{X}})
+    method_exists(start, Tuple{X}) ? :(IsIterable{X}) : :(Not{IsIterable{X}})
+end
 
 end # module
