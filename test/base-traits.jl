@@ -33,3 +33,5 @@ end
 
 @test istrait(IsIterable{Array})
 @test !istrait(IsIterable{Cmd})
+@test method_exists(start, Tuple{Base.UnitRange{Int}})
+@test method_exists(start, Tuple{Base.UnitRange})
