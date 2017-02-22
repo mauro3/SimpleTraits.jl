@@ -30,3 +30,8 @@ if VERSION < v"0.5.0-dev"
     # this give deprecation warning in Julia 0.5
     @test istrait(IsCallable{Base.AddFun})
 end
+
+if VERSION >= v"0.6.0-dev"
+    @test istrait(IsIterable{Array})
+    @test !istrait(IsIterable{Cmd})
+end
