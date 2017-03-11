@@ -82,19 +82,16 @@ type C9<:A9 end
 # This will overwrite the definition def1 above
 
 VERSION>=v"0.5" && VERSION<v"0.6-dev" && println("\nOne warning expected:")
-try # https://github.com/JuliaLang/julia/issues/20103
-    @traitfn f{X; !Tr2{X,X}}(x::X) = 10
-end
-try # https://github.com/JuliaLang/julia/issues/20103
-    @traitfn f{X; Tr2{X,X}}(x::X) = 100
-end
+@traitfn f{X; !Tr2{X,X}}(x::X) = 10
+@traitfn f{X; Tr2{X,X}}(x::X) = 100
 @test f(5)==10
 @test f(5.)==10
 @traitimpl Tr2{Integer, Integer}
 @test f(5.)==10
-if VERSION<v"0.6-dev"
+
+# Needed to update method cache (but not in 0.6 as #265 got fixed):
+if VERSION<v"0.6-dev" # in
     @test !(f(5)==100)
-    # needed to update method cache:
     VERSION>=v"0.5" && println("\nTwo warnings expected:")
     @traitfn f{X; Tr2{X,X}}(x::X) = 100
     println("")
