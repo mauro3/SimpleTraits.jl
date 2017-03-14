@@ -196,7 +196,7 @@ end
 # @traitfn f{X,Y;  Tr1{X,Y}}(x::X,y::Y) = ...
 # @traitfn f{X,Y; !Tr1{X,Y}}(x::X,y::Y) = ... # which is just sugar for:
 # @traitfn f{X,Y; Not{Tr1{X,Y}}}(x::X,y::Y) = ...
-let dispatch_cache = Set()  # to ensure that the trait-dispatch function is defined only once per pair
+let dispatch_cache = Dict()  # to ensure that the trait-dispatch function is defined only once per pair
     global traitfn
     function traitfn(tfn)
         # Need
@@ -213,8 +213,9 @@ let dispatch_cache = Set()  # to ensure that the trait-dispatch function is defi
         # Dissect AST into:
         # fbody: body
         # fname: symbol of name
-        # args0: vector of all arguments (without any gensym'ed symbols but stripped of Traitor-traits)
-        # args1: like args0 but with gensym'ed symbols were necessary
+        # args0: vector of all arguments except wags (without any gensym'ed symbols but stripped of Traitor-traits)
+        # args1: like args0 but with gensym'ed symbols where necessary
+        # kwargs: all kwargs
         # typs0: vector of all function parameters (without the trait-ones, no gensym'ed)
         # typs: vector of all function parameters (without the trait-ones, with gensym'ed for Traitor)
         # trait: expression of the trait
@@ -225,10 +226,13 @@ let dispatch_cache = Set()  # to ensure that the trait-dispatch function is defi
         fhead = tfn.args[1]
         fbody = tfn.args[2]
 
-        fname, paras, args0 = @match fhead begin
-            f_{paras__}(args0__) => (f,paras,args0)
-            f_(args__)           => (f,[],args)
+        fname, paras, args0, kwargs = @match fhead begin
+            f_{paras__}(args0__;kwargs__) => (f,paras,args0,kwargs)
+            f_(args0__; kwargs__)           => (f,[],args0,kwargs)
+            f_{paras__}(args0__) => (f,paras,args0,[])
+            f_(args0__)           => (f,[],args0,[])
         end
+        haskwargs = length(kwargs)>0
         if length(paras)>0 && isa(paras[1],Expr) && paras[1].head==:parameters
             # this is a Traits.jl style function
             trait = paras[1].args[1]
@@ -242,7 +246,7 @@ let dispatch_cache = Set()  # to ensure that the trait-dispatch function is defi
             typs0 = deepcopy(paras) # without gensym'ed types
             typs = paras
             out = nothing
-            i = 0
+            i = 0 # index of function argument with Traitor trait
             vararg = false
             for (i,a) in enumerate(args0)
                 vararg = a.head==:...
@@ -277,7 +281,6 @@ let dispatch_cache = Set()  # to ensure that the trait-dispatch function is defi
                 args1[i] = arg==nothing ? :(::$typ) : :($arg::$typ)
             end
             args1 = insertdummy(args1)
-
         end
 
         # Process dissected AST
@@ -297,22 +300,41 @@ let dispatch_cache = Set()  # to ensure that the trait-dispatch function is defi
         else
            pushloc = poploc = nothing
         end
+        # create the function containing the logic
         retsym = gensym()
         if hasmac
-            fn = :(@dummy $fname{$(typs...)}($val, $(args1...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
+            fn = :(@dummy $fname{$(typs...)}($val, $(args1...); $(kwargs...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
             fn.args[1] = mac # replace @dummy
         else
-            fn = :($fname{$(typs...)}($val, $(args1...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
+            fn = :($fname{$(typs...)}($val, $(args1...); $(kwargs...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
         end
+        # Create the trait dispatch function
         ex = fn
         key = (current_module(), fname, typs0, args0, trait0_opposite)
-        if !(key ∈ dispatch_cache)
-            ex = quote
-                $fname{$(typs...)}($(args1...)) = (Base.@_inline_meta(); $fname($curmod.trait($trait), $(strip_tpara(args1)...)))
-                $ex
+        if !(key ∈ keys(dispatch_cache)) # define trait dispatch function
+            if !haskwargs
+                ex = quote
+                    $fname{$(typs...)}($(args1...)) = (Base.@_inline_meta(); $fname($curmod.trait($trait),
+                                                                                    $(strip_tpara(args1)...)
+                                                                                    )
+                                                       )
+                    $ex
+                end
+            else
+                ex = quote
+                    $fname{$(typs...)}($(args1...);kwargs...) = (Base.@_inline_meta(); $fname($curmod.trait($trait),
+                                                                                              $(strip_tpara(args1)...);
+                                                                                              kwargs...
+                                                                                              )
+                                                                 )
+                    $ex
+                end
             end
-            push!(dispatch_cache, key)
-        else
+            dispatch_cache[key] = haskwargs
+        else # trait dispatch function already defined
+            if dispatch_cache[key]!=haskwargs
+                ex = :(error("Trait-functions can have keyword arguments.  But if so, add them to both `Tr` and `!Tr`."))
+            end
             delete!(dispatch_cache, key) # permits function redefinition if that's what we want
         end
         ex
@@ -353,6 +375,9 @@ function strip_tpara(a::Expr)
         return a.args[1]
     elseif a.head==:...
         return Expr(:..., strip_tpara(a.args[1]))
+    elseif a.head==:kw
+        @assert length(a.args)==2
+        return Expr(:kw, strip_tpara(a.args[1]), a.args[2])
     else
         error("Cannot parse argument: $a")
     end
@@ -360,6 +385,7 @@ end
 
 # insert dummy: ::X -> gensym()::X
 # also takes care of :...
+# not needed for kwargs
 insertdummy(args::Vector) = Any[insertdummy(a) for a in args]
 insertdummy(a::Symbol) = a
 function insertdummy(a::Expr)

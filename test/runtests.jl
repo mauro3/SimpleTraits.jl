@@ -125,6 +125,35 @@ end
 @test vara3t(5, 7, 8)==Int
 @test_throws MethodError vara3t(5, 7, 8.0)
 
+# kwargs (issue 27)
+@traitfn kwfn1(x::::Tr1; k=1) = x+k
+@traitfn kwfn1(x::::(!Tr1); k=2) = x-k
+@test kwfn1(5)==6
+@test kwfn1(5.0)==3.0
+@test kwfn1(5,k=2)==7
+@test kwfn1(5.0,k=3)==2.0
+
+@traitfn kwfn2(x::::Tr1, y...; k=1) = x+y[1]+k
+@traitfn kwfn2(x::::(!Tr1), y...; k::Int=2) = x+y[1]-k
+@test kwfn2(5,5)==11
+@test kwfn2(5.0,5)==8.0
+@test kwfn2(5,5,k=2)==12
+@test kwfn2(5.0,5,k=3)==7.0
+@test_throws TypeError kwfn2(5.0,5,k="sadf")
+
+@traitfn kwfn3(x::::Tr1, y...; kws...) = x+y[1]+length(kws)
+@traitfn kwfn3(x::::(!Tr1), y...; kws...) = x+y[1]-length(kws)
+@test kwfn3(5,5)==10
+@test kwfn3(5.0,5)==10
+@test kwfn3(5,5,k=2)==11
+@test kwfn3(5.0,5,k=3)==9
+@test kwfn3(5.0,5,k=3,kk=9)==8
+
+@traitfn kwfn4(x::::Tr1, y...; kws...) = x+y[1]+length(kws)
+@test_throws ErrorException @traitfn kwfn4(x::::(!Tr1), y...) = x+y[1]-length(kws)
+@traitfn kwfn5(x::::Tr1, y...) = x+y[1]+length(kws)
+@test_throws ErrorException @traitfn kwfn5(x::::(!Tr1), y...; k=1) = x+y[1]-length(kws)
+
 
 # with macro
 @traitfn @inbounds gg{X; Tr1{X}}(x::X) = x

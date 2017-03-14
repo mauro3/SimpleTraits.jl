@@ -112,7 +112,19 @@ SimpleTraits now supports this.  Above function `f` can be written as:
 Note that the parenthesis are needed with negated traits, otherwise a
 parser error is thrown.
 
-## Method overwritten warnings
+## Vararg and keyword argument trait functions
+
+Vararg and keyword argument trait functions work.  However, with
+keyword functions the trait function and negated trait function
+either need to both have keywords or not. Example:
+
+```julia
+@traitfn kwfn(x::::Tr1, y...; kws...) = x+y[1]+length(kws)
+@traitfn kwfn(x::::(!Tr1), y...; kws...) = x+y[1]+length(kws)
+```
+
+
+## Method overwritten warnings in Julia 0.5
 
 As of Julia 0.5 warnings are issued when methods are overwritten.  Due
 to Tim's trick the `@traitfn` needs to create two functions the first
