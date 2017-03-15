@@ -81,7 +81,7 @@ type C9<:A9 end
 
 # This will overwrite the definition def1 above
 
-VERSION>=v"0.5" && VERSION<v"0.6-dev" && println("\nOne warning expected:")
+VERSION<v"0.6-dev" && println("\nOne warning expected:")
 @traitfn f{X; !Tr2{X,X}}(x::X) = 10
 @traitfn f{X; Tr2{X,X}}(x::X) = 100
 @test f(5)==10
@@ -90,9 +90,9 @@ VERSION>=v"0.5" && VERSION<v"0.6-dev" && println("\nOne warning expected:")
 @test f(5.)==10
 
 # Needed to update method cache (but not in 0.6 as #265 got fixed):
-if VERSION<v"0.6-dev" # in
+if VERSION<v"0.6.0-dev.1671" # https://github.com/JuliaLang/julia/pull/17057
     @test !(f(5)==100)
-    VERSION>=v"0.5" && println("\nTwo warnings expected:")
+    println("\nTwo warnings expected:")
     @traitfn f{X; Tr2{X,X}}(x::X) = 100
     println("")
 end
@@ -204,7 +204,4 @@ end
 # Other tests
 #####
 include("base-traits.jl")
-
-if VERSION >= v"0.5.0-dev"
-    include("backtraces.jl")
-end
+include("backtraces.jl")

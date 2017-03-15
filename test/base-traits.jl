@@ -26,10 +26,8 @@ c = view(a, 1:2:5)
 @test istrait(IsIndexLinear{Vector})
 @test !istrait(IsIndexLinear{AbstractArray})
 
-if VERSION < v"0.5.0-dev"
-    # this give deprecation warning in Julia 0.5
-    @test istrait(IsCallable{Base.AddFun})
-end
+type T9867 end
+@test istrait(IsCallable{T9867})
 
 @test istrait(IsIterable{Array})
 @test !istrait(IsIterable{Cmd})

@@ -24,7 +24,7 @@ export IsLeafType, IsBits, IsImmutable, IsContiguous, IsIndexLinear,
 
 "Trait of all callable objects"
 @traitdef IsCallable{X}
-@traitimpl IsCallable{X} <- (X->(X==Function ||  length(methods(call, (X,Vararg)))>0))(X)
+@traitimpl IsCallable{X} <- (X->(X<:Function ||  length(methods(X))>0))(X)
 
 "Trait of all leaf types types"
 @traitdef IsLeafType{X}
