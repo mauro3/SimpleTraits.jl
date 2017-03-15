@@ -4,6 +4,9 @@
 [![Build Status](https://ci.appveyor.com/api/projects/status/github/mauro3/SimpleTraits.jl?branch=master&svg=true)](https://ci.appveyor.com/project/mauro3/simpletraits-jl/branch/master)
 [NEWS](NEWS.md)
 
+[![SimpleTraits](http://pkg.julialang.org/badges/SimpleTraits_0.5.svg)](http://pkg.julialang.org/?pkg=SimpleTraits)
+[![SimpleTraits](http://pkg.julialang.org/badges/SimpleTraits_0.6.svg)](http://pkg.julialang.org/?pkg=SimpleTraits)
+
 This package provides a macro-based implementation of traits, using
 [Tim Holy's trait trick](https://github.com/JuliaLang/julia/issues/2345#issuecomment-54537633).
 The main idea behind traits is to group types outside the
