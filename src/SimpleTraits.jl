@@ -121,7 +121,7 @@ false.  This can be done with:
 ```julia
 @traitimpl IsFast{T} <- isfast(T)
 ```
-where `isfast` is that check-function.  This generates a `@generated
+where `isfast` is that check-function.  This generates a `@generated`
 function under the hood.
 
 Note that traits implemented with the former of above methods will
