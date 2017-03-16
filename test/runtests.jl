@@ -154,8 +154,11 @@ end
 @traitfn kwfn5(x::::Tr1, y...) = x+y[1]+length(kws)
 @test_throws ErrorException @traitfn kwfn5(x::::(!Tr1), y...; k=1) = x+y[1]-length(kws)
 
+# default args, issue #32
+@traitfn defargs1(x::::Tr1, y=2) = x+y
+@test_broken defargs1(1,2)==3
 
-# with macro
+# traitfn with macro
 @traitfn @inbounds gg{X; Tr1{X}}(x::X) = x
 @test gg(5)==5
 @traitfn @generated ggg{X; Tr1{X}}(x::X) = X<:AbstractArray ? :(x+1) : :(x)
