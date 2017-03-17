@@ -154,9 +154,47 @@ end
 @traitfn kwfn5(x::::Tr1, y...) = x+y[1]+length(kws)
 @test_throws ErrorException @traitfn kwfn5(x::::(!Tr1), y...; k=1) = x+y[1]-length(kws)
 
-# default args, issue #32
+# Default args, issue #32
+####
 @traitfn defargs1(x::::Tr1, y=2) = x+y
-@test_broken defargs1(1,2)==3
+@traitfn defargs1(x::::(!Tr1), y=2) = x-y
+@test defargs1(1,3)==4
+@test defargs1(1)==3
+@test defargs1(1.0,4)==-3
+@test defargs1(1.0)==-1
+
+@traitfn defargs2(x::::Tr1, y=2) = x+y
+@test_throws ErrorException @traitfn defargs2(x::::(!Tr1), y=3) = x-y
+@traitfn defargs3(x::::Tr1, y=2) = x+y
+@test_throws ErrorException @traitfn defargs3(x::::(!Tr1), y) = x-y
+
+
+@traitfn defargs4(x::::Tr1, y=2; k=1) = x+y+k
+@traitfn defargs4(x::::(!Tr1), y=2; k=2) = x-y+k
+@test defargs4(1,3)==5
+@test defargs4(1)==4
+@test defargs4(1.0,4)==-1
+@test defargs4(1.0)==1
+@test defargs4(1.0, k=10)==9
+
+@traitfn defargs5(x::::Tr1, y=2, z...; k=1) = (x+y+k,z)
+@traitfn defargs5(x::::(!Tr1), y=2, z...; k=2) = (x-y+k,z)
+@test defargs5(1,3)==(5,())
+@test defargs5(1,3,4,5)==(5,(4,5))
+@test defargs5(1)==(4,())
+@test defargs5(1.0,4)==(-1,())
+@test defargs5(1.0,k=10)==(9,())
+
+@traitfn defargs6{X;  Tr1{X}}(x::X=1, y=2) = x+y
+@traitfn defargs6{X; !Tr1{X}}(x::X=1, y=2) = x-y
+@test defargs6()==3
+@test defargs6(1,3)==4
+@test defargs6(1)==3
+@test defargs6(1.0,4)==-3
+@test defargs6(1.0)==-1
+# above does not work with Traitor syntax
+@test_broken SimpleTraits.traitfn(:(defargs6a(x::::Tr1=1, y=2) = x+y))
+
 
 # traitfn with macro
 @traitfn @inbounds gg{X; Tr1{X}}(x::X) = x

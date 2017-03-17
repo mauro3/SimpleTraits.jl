@@ -196,7 +196,9 @@ end
 # @traitfn f{X,Y;  Tr1{X,Y}}(x::X,y::Y) = ...
 # @traitfn f{X,Y; !Tr1{X,Y}}(x::X,y::Y) = ... # which is just sugar for:
 # @traitfn f{X,Y; Not{Tr1{X,Y}}}(x::X,y::Y) = ...
-let dispatch_cache = Dict()  # to ensure that the trait-dispatch function is defined only once per pair
+
+dispatch_cache = Dict()  # to ensure that the trait-dispatch function is defined only once per pair
+let
     global traitfn
     function traitfn(tfn)
         # Need
@@ -303,19 +305,19 @@ let dispatch_cache = Dict()  # to ensure that the trait-dispatch function is def
         # create the function containing the logic
         retsym = gensym()
         if hasmac
-            fn = :(@dummy $fname{$(typs...)}($val, $(args1...); $(kwargs...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
+            fn = :(@dummy $fname{$(typs...)}($val, $(strip_kw(args1)...); $(kwargs...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
             fn.args[1] = mac # replace @dummy
         else
-            fn = :($fname{$(typs...)}($val, $(args1...); $(kwargs...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
+            fn = :($fname{$(typs...)}($val, $(strip_kw(args1)...); $(kwargs...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
         end
         # Create the trait dispatch function
         ex = fn
-        key = (current_module(), fname, typs0, args0, trait0_opposite)
+        key = (current_module(), fname, typs0, strip_kw(args0), trait0_opposite)
         if !(key ∈ keys(dispatch_cache)) # define trait dispatch function
             if !haskwargs
                 ex = quote
                     $fname{$(typs...)}($(args1...)) = (Base.@_inline_meta(); $fname($curmod.trait($trait),
-                                                                                    $(strip_tpara(args1)...)
+                                                                                    $(strip_tpara(strip_kw(args1))...)
                                                                                     )
                                                        )
                     $ex
@@ -323,17 +325,26 @@ let dispatch_cache = Dict()  # to ensure that the trait-dispatch function is def
             else
                 ex = quote
                     $fname{$(typs...)}($(args1...);kwargs...) = (Base.@_inline_meta(); $fname($curmod.trait($trait),
-                                                                                              $(strip_tpara(args1)...);
+                                                                                              $(strip_tpara(strip_kw(args1))...);
                                                                                               kwargs...
                                                                                               )
                                                                  )
                     $ex
                 end
             end
-            dispatch_cache[key] = haskwargs
+            dispatch_cache[key] = (haskwargs, args0)
         else # trait dispatch function already defined
-            if dispatch_cache[key]!=haskwargs
-                ex = :(error("Trait-functions can have keyword arguments.  But if so, add them to both `Tr` and `!Tr`."))
+            if dispatch_cache[key][1]!=haskwargs
+                ex = :(error("""
+                             Trait-functions can have keyword arguments.
+                             But if so, add the same to both `Tr` and `!Tr`, but they can have different default values.
+                             """))
+            end
+            if dispatch_cache[key][2]!=args0
+                ex = :(error("""
+                             Trait-functions can have default arguments.
+                             But if so, add them to both `Tr` and `!Tr`, and they both need identical values!
+                             """))
             end
             delete!(dispatch_cache, key) # permits function redefinition if that's what we want
         end
@@ -382,6 +393,24 @@ function strip_tpara(a::Expr)
         error("Cannot parse argument: $a")
     end
 end
+
+
+# [:(x::X=4)] -> [:x::X]
+# i.e. strips defaults arguments
+# also takes care of :...
+strip_kw(args::Vector) = Any[strip_kw(a) for a in args]
+strip_kw(a) = a
+function strip_kw(a::Expr)
+    if a.head==:(::) || a.head==:...
+        return a
+    elseif a.head==:kw
+        @assert length(a.args)==2
+        return a.args[1]
+    else
+        error("Cannot parse argument: $a")
+    end
+end
+
 
 # insert dummy: ::X -> gensym()::X
 # also takes care of :...
