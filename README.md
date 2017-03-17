@@ -115,17 +115,26 @@ SimpleTraits now supports this.  Above function `f` can be written as:
 Note that the parenthesis are needed with negated traits, otherwise a
 parser error is thrown.
 
-## Vararg and keyword argument trait functions
+## Vararg, default argument and keyword argument trait functions
 
-Vararg and keyword argument trait functions work.  However, with
-keyword functions the trait function and negated trait function
-either need to both have keywords or not. Example:
+Vararg, default argument and keyword argument trait functions work.
+However, with keyword arguments the trait function and negated trait
+function need both have the same keywords (however different values
+are allowed). Example:
 
 ```julia
-@traitfn kwfn(x::::Tr1, y...; kws...) = x+y[1]+length(kws)
-@traitfn kwfn(x::::(!Tr1), y...; kws...) = x+y[1]+length(kws)
+@traitfn kwfn(x::::Tr1, y...; kw=1) = x+y[1]+kw
+@traitfn kwfn(x::::(!Tr1), y...; kw=2) = x+y[1]+kw
 ```
 
+For default arguments the rule is slightly different: with default
+arguments the trait function and negated trait function need both have
+the same default-argument with the *same values*.
+
+```julia
+@traitfn deff(x::::Tr1, y=1) = x+y
+@traitfn deff(x::::(!Tr1), y=1) = x+y
+```
 
 ## Method overwritten warnings in Julia 0.5
 
