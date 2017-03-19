@@ -29,7 +29,7 @@ c = view(a, 1:2:5)
 type T9867 end
 @test istrait(IsCallable{T9867})
 
-@test istrait(IsIterable{Array})
-@test !istrait(IsIterable{Cmd})
-@test istrait(IsIterable{Base.UnitRange{Int}})
-@test istrait(IsIterable{Base.UnitRange})
+@test istrait(IsIterator{Array})
+@test !istrait(IsIterator{Cmd})
+@test istrait(IsIterator{Base.UnitRange{Int}})
+@test istrait(IsIterator{Base.UnitRange})
