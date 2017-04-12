@@ -151,13 +151,13 @@ macro traitimpl(tr)
         if !negated
             return quote
                 $fnhead = $trname{$(paras...)}
-                VERSION < "v0.6-" && ($isfnhead = true) # Add the istrait definition as otherwise
+                VERSION < v"0.6-" && ($isfnhead = true) # Add the istrait definition as otherwise
                 # method-caching can be an issue.
             end
         else
             return quote
                 $fnhead = Not{$trname{$(paras...)}}
-                VERSION < "v0.6-" && ($isfnhead = false) # Add the istrait definition as otherwise
+                VERSION < v"0.6-" && ($isfnhead = false) # Add the istrait definition as otherwise
                 # method-caching can be an issue.
             end
         end
