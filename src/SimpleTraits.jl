@@ -121,8 +121,7 @@ false.  This can be done with:
 ```julia
 @traitimpl IsFast{T} <- isfast(T)
 ```
-where `isfast` is that check-function.  This generates a `@generated`
-function under the hood.
+where `isfast` is that check-function.
 
 Note that traits implemented with the former of above methods will
 override an implementation with the latter method.  Thus it can be
@@ -152,13 +151,13 @@ macro traitimpl(tr)
         if !negated
             return quote
                 $fnhead = $trname{$(paras...)}
-                $isfnhead = true # Add the istrait definition as otherwise
+                VERSION < v"0.6-" && ($isfnhead = true) # Add the istrait definition as otherwise
                 # method-caching can be an issue.
             end
         else
             return quote
                 $fnhead = Not{$trname{$(paras...)}}
-                $isfnhead = false# Add the istrait definition as otherwise
+                VERSION < v"0.6-" && ($isfnhead = false) # Add the istrait definition as otherwise
                 # method-caching can be an issue.
             end
         end
@@ -169,24 +168,13 @@ macro traitimpl(tr)
             Tr_{P1__} <- fn_(P2__) => (false, Tr, P1, fn, P2)
         end
         if negated
-            return esc(
-                quote
-                @generated function SimpleTraits.trait{$(P1...)}(::Type{$Tr{$(P1...)}})
-                    Tr = $Tr
-                    P1 = $P1
-                    return $fn($(P2...)) ? :(Not{$Tr{$(P1...)}}) : :($Tr{$(P1...)})
-                end
-            end)
-        else
-            return esc(
-                quote
-                @generated function SimpleTraits.trait{$(P1...)}(::Type{$Tr{$(P1...)}})
-                    Tr = $Tr
-                    P1 = $P1
-                    return $fn($(P2...)) ? :($Tr{$(P1...)}) : :(Not{$Tr{$(P1...)}})
-                end
-            end)
+            fn = Expr(:call, GlobalRef(SimpleTraits, :!), fn)
         end
+        return esc(quote
+            function SimpleTraits.trait{$(P1...)}(::Type{$Tr{$(P1...)}})
+                return $fn($(P2...)) ? $Tr{$(P1...)} : Not{$Tr{$(P1...)}}
+            end
+        end)
     else
         error("Cannot parse $tr")
     end
