@@ -245,4 +245,5 @@ end
 # Other tests
 #####
 include("base-traits.jl")
+include("base-traits-inference.jl")
 include("backtraces.jl")
