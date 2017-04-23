@@ -62,12 +62,21 @@ it can be used like so:
 ```julia
 @traitimpl IsNice{X} <- isnice(X)
 ```
+
 i.e. any type `X` for which `isnice(X)==true` belongs to `IsNice`.
-Note that this generates a generated-function under the hood and thus
-[restrictions](http://docs.julialang.org/en/release-0.5/manual/metaprogramming/#generated-functions)
-on `isnice` apply.  Last note that in above example the `@traitimpl IsNice{Int}` "wins"
-over the `@traitimpl IsNice{X} <- isnice(X)`, thus
-this can be used to define exceptions to a rule.
+Notes:
+
+- on Julia-0.5 this generates a generated-function under the
+  hood and thus [restrictions](http://docs.julialang.org/en/release-0.5/manual/metaprogramming/#generated-functions)
+  on `isnice` apply.
+- on Julia-0.6 no generated function is used and overhead-less dispatch
+  is only possible if `isnice` is *pure*: "[A pure method]
+  promises that the result will always be the same constant regardless
+  of when the method is called [for the same input arguments]."
+  ([ref](https://github.com/mauro3/SimpleTraits.jl/pull/39#issuecomment-293629338)).
+- Last note that in above example the `@traitimpl
+  IsNice{Int}` "wins" over the `@traitimpl IsNice{X} <- isnice(X)`, thus
+  this can be used to define exceptions to a rule.
 
 It can be checked whether a type belongs to a trait with `istrait`:
 ```julia
@@ -259,17 +268,30 @@ istrait(IsBits{A}) # true
 ```
 
 Dynamic dispatch can be avoided using a generated
-function (or maybe sometimes `Base.@pure` functions?):
+function or *pure* functions in Julia-0.6 (sometimes they need to be
+annotated with `Base.@pure`):
 ```julia
 @traitdef IsBits{X}
 @generated function SimpleTraits.trait{X1}(::Type{IsBits{X1}})
     isbits(X1) ? :(IsBits{X1}) : :(Not{IsBits{X1}})
 end
+# or on 0.6
+function SimpleTraits.trait{X1}(::Type{IsBits{X1}})
+    isbits(X1) ? IsBits{X1} : Not{IsBits{X1}}
+end
 ```
-Note that these programmed-traits can be combined with `@traitimpl`,
-i.e. program the general case and add exceptions with `@traitimpl`.
+What is allowed in generated functions is heavily restricted, see
+[Julia manual](https://docs.julialang.org/en/latest/manual/metaprogramming.html#Generated-functions-1).
+In particular (in Julia 0.6), no methods which are defined after the
+generated function are allowed to be called inside the generated
+function, otherwise
+[this](https://github.com/JuliaLang/julia/issues/21356) issue is
+encountered.
 
-Trait-inheritance can also be hand-coded with above trick.  For
+Note that these programmed-traits can be combined with `@traitimpl IsBits{XYZ}`,
+i.e. program the general case and add exceptions with `@traitimpl IsBits{XYZ}`.
+
+Trait-inheritance can also be hand-coded with above trick, in Julia 0.5.  For
 instance, the trait given by (in pseudo syntax) `BeautyAndBeast{X,Y} <: IsNice{X},
 !IsNice{Y}, BelongTogether{X,Y}`:
 ```julia
@@ -281,7 +303,18 @@ instance, the trait given by (in pseudo syntax) `BeautyAndBeast{X,Y} <: IsNice{X
         :(Not{BeautyAndBeast{X,Y}})
     end
 end
+# or in 0.6
+function SimpleTraits.trait{X,Y}(::Type{BeautyAndBeast{X,Y}})
+    if istrait(IsNice{X}) && !istrait(IsNice{Y}) && BelongTogether{X,Y}
+        BeautyAndBeast{X,Y}
+    else
+        Not{BeautyAndBeast{X,Y}}
+    end
+end
 ```
+Note that in Julia 0.6, this will lead to slower, dynamic dispatch, as
+the latter function is not pure (it depends on the global state of
+which types belong to the traits `IsNice` and `BelongTogether`).
 
 
 Note also that trait functions can be generated functions:
@@ -390,7 +423,8 @@ on letting functions use dispatch based on traits.  This dispatch is
 currently fairly limited, see section "Gotcha" above, but may be
 expanded in the future: either through something like in PR
 [m3/multitraits](https://github.com/mauro3/SimpleTraits.jl/pull/2) or
-through a more general generated-function approach.
+through a more general generated-function approach (definitely not
+valid anymore in Julia 0.6).
 
 In the unlikely event that I find myself with too much time on my
 hands, I may try to develop a companion package to allow the
