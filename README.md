@@ -236,6 +236,24 @@ Source line: 185
 shows that the normal method and the trait-method compile down to the
 same machine instructions.
 
+However, if the trait-grouping function is not constant or a generated
+function then dispatch may be dynamic.  This can be checked with
+`@check_fast_traitdispatch`, which checks whether the number of lines
+of LLVM code is the same for a trait function than a normal one:
+```julia
+# julia 0.6
+checkfn(x) = rand()>0.5 ? true : false # a bit crazy!
+@traitdef TestTr{X}
+@traitimpl TestTr{X} <- checkfn(X)
+# this tests a trait-function with TestTr{Int}:
+@check_fast_traitdispatch TestTr
+# this tests a trait-function with TestTr{String} and will
+# also prints number of LLCM-IR lines of trait vs normal function:
+@check_fast_traitdispatch TestTr String true
+```
+Note that this example only works in Julia 0.6, in Julia 0.5 it
+produces just wrong results.
+
 ## Advanced features
 
 The macros of the previous section are the official API of the package
@@ -253,9 +271,10 @@ returns `Not{TraitInQuestion{...}}` otherwise (this is the fall-back
 for `<:Any`).  So instead of using `@traitimpl` this can be coded
 directly.  Note that anything but a constant function will probably
 not be inlined away by the JIT and will lead to slower dynamic
-dispatch.
+dispatch (see `@check_fast_traitdispatch` for a helper to check).
 
-Example leading to dynamic dispatch:
+Example leading to dynamic dispatch in Julia 0.5 (but works well in
+Julia 0.6):
 ```julia
 @traitdef IsBits{X}
 SimpleTraits.trait{X1}(::Type{IsBits{X1}}) = isbits(X1) ? IsBits{X1} : Not{IsBits{X1}}
@@ -274,10 +293,6 @@ annotated with `Base.@pure`):
 @traitdef IsBits{X}
 @generated function SimpleTraits.trait{X1}(::Type{IsBits{X1}})
     isbits(X1) ? :(IsBits{X1}) : :(Not{IsBits{X1}})
-end
-# or on 0.6
-function SimpleTraits.trait{X1}(::Type{IsBits{X1}})
-    isbits(X1) ? IsBits{X1} : Not{IsBits{X1}}
 end
 ```
 What is allowed in generated functions is heavily restricted, see

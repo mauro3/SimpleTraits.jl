@@ -8,7 +8,7 @@ const curmod = module_name(current_module())
 # This is basically just adding a few convenience functions & macros
 # around Holy Traits.
 
-export Trait, istrait, @traitdef, @traitimpl, @traitfn, Not
+export Trait, istrait, @traitdef, @traitimpl, @traitfn, Not, @check_fast_traitdispatch
 
 # All traits are concrete subtypes of this trait.  SUPER is not used
 # but present to be compatible with Traits.jl.
@@ -450,6 +450,62 @@ findline(arg) = nothing
 ####
 # Extras
 ####
+
+# # This does not work.  Errors on compilation with:
+# # ERROR: LoadError: UndefVarError: Tr not defined
+# function check_traitdispatch(Tr; nlines=5, Args=(Int,))
+#     @traitfn fn_test(x::::Tr) = 1
+#     @traitfn fn_test(x::::(!Tr)) = 2
+#     @assert llvm_lines(fn_test, Args) == nlines
+# end
+
+
+"""
+    check_fast_traitdispatch(Tr, Args=(Int,), nlines=6, verbose=false)
+
+Macro to check whether a trait-dispatch is fast (i.e. as fast as an
+ordinary function call) or whether dispatch is slow (dynamic).  Only
+works with single parameters traits (so far).
+
+Optional arguments are:
+- Type parameter to the trait (default `Int`)
+- Verbosity (default `false`)
+
+Example:
+
+    @check_fast_traitdispatch IsBits
+    @check_fast_traitdispatch IsBits String true
+
+TODO: This is rather ugly.  Ideally this would be a function but I ran
+into problems, see source code.  Also the macro is ugly.  PRs welcome...
+"""
+macro check_fast_traitdispatch(Tr, Arg=:Int, verbose=false)
+    test_fn = gensym()
+    test_fn_null = gensym()
+    nl = gensym()
+    nl_null = gensym()
+    out = gensym()
+    esc(quote
+        $test_fn_null(x) = 1
+        $nl_null = SimpleTraits.llvm_lines($test_fn_null, ($Arg,))
+        @traitfn $test_fn(x::::$Tr) = 1
+        @traitfn $test_fn(x::::(!$Tr)) = 2
+        $nl = SimpleTraits.llvm_lines($test_fn, ($Arg,))
+        $out = $nl == $nl_null
+        if $verbose && !$out
+            println("Number of llvm code lines $($nl) but should be $($nl_null).")
+        end
+        $out
+    end)
+end
+
+"Returns number of llvm-IR lines for a call of function `fn` with argument types `args`"
+function llvm_lines(fn, args)
+    io = IOBuffer()
+    Base.code_llvm(io, fn, args)
+    #Base.code_native(io, fn, args)
+    count(c->c=='\n', String(io))
+end
 
 include("base-traits.jl")
 
