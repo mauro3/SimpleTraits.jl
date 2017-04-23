@@ -11,8 +11,8 @@ export IsLeafType, IsBits, IsImmutable, IsContiguous, IsIndexLinear,
 @traitimpl IsAnything{X} <- (x->true)(X)
 
 "Trait which contains no types"
-@compat const IsNothing{X} = Not{IsAnything{X}}
-
+@traitdef IsNothing{X}
+@traitimpl IsNothing{X} <- (x->false)(X)
 
 "Trait of all isbits-types"
 @traitdef IsBits{X}
@@ -20,7 +20,8 @@ export IsLeafType, IsBits, IsImmutable, IsContiguous, IsIndexLinear,
 
 "Trait of all immutable types"
 @traitdef IsImmutable{X}
-@traitimpl IsImmutable{X}  <- (X->!X.mutable)(X)
+Base.@pure _isimmutable(X) = !X.mutable
+@traitimpl IsImmutable{X}  <- _isimmutable(X)
 
 "Trait of all callable objects"
 @traitdef IsCallable{X}

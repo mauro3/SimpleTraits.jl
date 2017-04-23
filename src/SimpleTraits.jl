@@ -152,13 +152,13 @@ macro traitimpl(tr)
             return quote
                 $fnhead = $trname{$(paras...)}
                 VERSION < v"0.6-" && ($isfnhead = true) # Add the istrait definition as otherwise
-                # method-caching can be an issue.
+                                                        # method-caching can be an issue.
             end
         else
             return quote
                 $fnhead = Not{$trname{$(paras...)}}
                 VERSION < v"0.6-" && ($isfnhead = false) # Add the istrait definition as otherwise
-                # method-caching can be an issue.
+                                                         # method-caching can be an issue.
             end
         end
     elseif tr.head==:call
@@ -170,11 +170,21 @@ macro traitimpl(tr)
         if negated
             fn = Expr(:call, GlobalRef(SimpleTraits, :!), fn)
         end
-        return esc(quote
-            function SimpleTraits.trait{$(P1...)}(::Type{$Tr{$(P1...)}})
-                return $fn($(P2...)) ? $Tr{$(P1...)} : Not{$Tr{$(P1...)}}
-            end
-        end)
+        if VERSION < v"0.6-"
+            return esc(quote
+                           @generated function SimpleTraits.trait{$(P1...)}(::Type{$Tr{$(P1...)}})
+                               Tr = $Tr
+                               P1 = $P1
+                               return $fn($(P2...)) ? :($Tr{$(P1...)}) : :(Not{$Tr{$(P1...)}})
+                           end
+                       end)
+        else
+            return esc(quote
+                           function SimpleTraits.trait{$(P1...)}(::Type{$Tr{$(P1...)}})
+                               return $fn($(P2...)) ? $Tr{$(P1...)} : Not{$Tr{$(P1...)}}
+                           end
+                       end)
+        end
     else
         error("Cannot parse $tr")
     end
