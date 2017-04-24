@@ -476,10 +476,18 @@ Example:
     @check_fast_traitdispatch IsBits
     @check_fast_traitdispatch IsBits String true
 
+NOTE: This only works when code-coverage is disabled!  Thus, do not
+use this macro in tests (or disable `coverage=true` in your
+`.travis.yml` script), or it will error.
+
 TODO: This is rather ugly.  Ideally this would be a function but I ran
 into problems, see source code.  Also the macro is ugly.  PRs welcome...
 """
 macro check_fast_traitdispatch(Tr, Arg=:Int, verbose=false)
+    if Base.JLOptions().code_coverage==1
+        warn("The SimpleTraits.@check_fast_traitdispatch macro only works when running Julia without --code-coverage")
+        return nothing
+    end
     test_fn = gensym()
     test_fn_null = gensym()
     nl = gensym()

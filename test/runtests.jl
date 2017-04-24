@@ -241,6 +241,21 @@ end
 @test f12t(1)==1
 @test f12t(5.5)==2
 
+
+###
+# @traitimpl Tr{X} <- istr(X)
+@traitdef TrArrow1{X}
+isarrow(X) = eltype(X)<:Integer ? true : false
+@traitimpl TrArrow1{X} <- isarrow(X)
+@test istrait(TrArrow1{Vector{Int}})
+@test !istrait(TrArrow1{Vector{Float64}})
+
+@traitdef TrArrow2{X}
+@traitimpl Not{TrArrow2{X}} <- isarrow(X)
+@test !istrait(TrArrow2{Vector{Int}})
+@test istrait(TrArrow2{Vector{Float64}})
+
+
 ######
 # Other tests
 #####
