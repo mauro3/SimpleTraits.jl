@@ -153,12 +153,14 @@ macro traitimpl(tr)
                 $fnhead = $trname{$(paras...)}
                 VERSION < v"0.6-" && ($isfnhead = true) # Add the istrait definition as otherwise
                                                         # method-caching can be an issue.
+                nothing
             end
         else
             return quote
                 $fnhead = Not{$trname{$(paras...)}}
                 VERSION < v"0.6-" && ($isfnhead = false) # Add the istrait definition as otherwise
                                                          # method-caching can be an issue.
+                nothing
             end
         end
     elseif tr.head==:call
@@ -177,12 +179,14 @@ macro traitimpl(tr)
                                P1 = $P1
                                return $fn($(P2...)) ? :($Tr{$(P1...)}) : :(Not{$Tr{$(P1...)}})
                            end
+                           nothing
                        end)
         else
             return esc(quote
                            function SimpleTraits.trait{$(P1...)}(::Type{$Tr{$(P1...)}})
                                return $fn($(P2...)) ? $Tr{$(P1...)} : Not{$Tr{$(P1...)}}
                            end
+                           nothing
                        end)
         end
     else

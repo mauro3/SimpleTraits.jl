@@ -30,6 +30,6 @@ type T9867 end
 @test istrait(IsCallable{T9867})
 
 @test istrait(IsIterator{Array})
-@test !istrait(IsIterator{Cmd})
+@test !istrait(IsIterator{Symbol})
 @test istrait(IsIterator{Base.UnitRange{Int}})
 @test istrait(IsIterator{Base.UnitRange})
