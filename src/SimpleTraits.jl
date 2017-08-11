@@ -323,6 +323,7 @@ let
             end
             if isnegated(trait0)
                 trait = :(!($(trait0.args[2])($typ)))
+                # TODO: this fails if there are no parameters:
                 trait_wo_assoc = :(!($(trait0.args[2].args[1])($typ)))
                 assocs = trait0.args[2].args[2:end]
             else
