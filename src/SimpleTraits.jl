@@ -1,4 +1,4 @@
-__PRECOMPILE__()
+__precompile__()
 
 module SimpleTraits
 using Base.Iterators
