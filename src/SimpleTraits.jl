@@ -1,4 +1,4 @@
-__precompile__()
+__PRECOMPILE__()
 
 module SimpleTraits
 using Base.Iterators
@@ -82,7 +82,7 @@ Examples:
 @traitdef LikeArray{T,N}(Ar) # with associated types
 ```
 """
-function _traitdef(tr)
+function traitdef(tr)
     Tr, A, T = @match tr begin
         (
             Tr_{A__}(T__)
@@ -119,7 +119,7 @@ function _traitdef(tr)
     end
 end
 macro traitdef(tr)
-    _traitdef(tr)
+    traitdef(tr)
 end
 
 """
@@ -170,7 +170,7 @@ macro traitimpl(tr)
         Ps = tr.args[2:end]
         ps = map(esc, Ps)
         tr = tr.args[1]
-        haswhere = true
+        haswhere = true # e.g. @traitimpl IsIterator{T}(Array{T}) where T
     else
         haswhere = false
     end
@@ -204,42 +204,37 @@ macro traitimpl(tr)
         if !hasassoc
             if !isnegated(tr)
                 if haswhere
-                    return :( ( $trname($(typs...)) ) where {$(ps...)} = $trname() )
+                    return :( ( $trname($(typs...)) ) where {$(ps...)} = $trname(); nothing)
                 else
-                    return :( $trname($(typs...)) = $trname() )
+                    return :( $trname($(typs...)) = $trname(); nothing)
                 end
             else
                 if haswhere
-                    return :( $trname($(typs...)) where {$(ps...)} = Not{$trname}() )
+                    return :( $trname($(typs...)) where {$(ps...)} = Not{$trname}(); nothing)
                 else
-                    return :( $trname($(typs...)) = Not{$trname}() )
+                    return :( $trname($(typs...)) = Not{$trname}(); nothing)
                 end
             end
         else # with associated types
             assoc = map(esc, A)
             if !isnegated(tr)
                 if haswhere
-                    return :( $trname($(typs...)) where {$(ps...)} = $trname{$(assoc...)}() )
+                    return quote
+                        $trname($(typs...)) where {$(ps...)} = $trname{$(assoc...)}()
+                        nothing
+                    end
                 else
-                    return :( $trname($(typs...)) = $trname{$(assoc...)}() )
+                    return :( $trname($(typs...)) = $trname{$(assoc...)}() ; nothing )
                 end
             else
                 if haswhere
-                    return :( $trname($(typs...)) where {$(ps...)} = Not{$trname{$(assoc...)}}() )
+                    return quote
+                         $trname($(typs...)) where {$(ps...)} = Not{$trname{$(assoc...)}}()
+                         nothing
+                    end
                 else
-                    return :( $trname($(typs...)) = Not{$trname{$(assoc...)}}() )
+                    return :( $trname($(typs...)) = Not{$trname{$(assoc...)}}(); nothing)
                 end
-            end
-        end
-        if !negated
-            return quote
-                $trname{$(paras...)} = $trname
-                nothing
-            end
-        else
-            return quote
-                Not{$trname{$(paras...)}} = $trname
-                nothing
             end
         end
     elseif tr.head==:call # @traitimpl IsFast(T) <- isfast(T)
@@ -249,11 +244,6 @@ macro traitimpl(tr)
     end
 end
 
-macro traitfn(tfn)
-    nothing
-end
-
-#=
 # Defining a function dispatching on the trait (or not)
 # @traitfn f{X,Y;  Tr1{X,Y}}(x::X,y::Y) = ...
 # @traitfn f{X,Y; !Tr1{X,Y}}(x::X,y::Y) = ... # which is just sugar for:
@@ -332,10 +322,16 @@ let
                 push!(typs, typ)
             end
             if isnegated(trait0)
-                trait = :(!($(trait0.args[2]){$typ}))
+                trait = :(!($(trait0.args[2])($typ)))
+                trait_wo_assoc = :(!($(trait0.args[2].args[1])($typ)))
+                assocs = trait0.args[2].args[2:end]
             else
-                trait = :($trait0{$typ})
+                trait = :($trait0($typ))
+                trait_wo_assoc = :($(trait0.args[1])($typ))
+                assocs = trait0.args[2:end]
             end
+            typs_wo_assoc = [t for t in typs if !(t in assocs)]
+
             args1 = deepcopy(args0)
             if vararg
                 args0[i] = arg==nothing ? nothing : :($arg...).args[1]
@@ -349,12 +345,12 @@ let
 
         # Process dissected AST
         if isnegated(trait)
-            trait0_opposite = trait0 # opposite of `trait` below as that gets stripped of !
+            trait0_opposite = trait0 # opposite of `trait` below a372s that gets stripped of !
             trait = trait.args[2]
-            val = :(::Type{$curmod.Not{$trait}})
+            val = :(::$curmod.Not{$(trait.args[1])})
         else
             trait0_opposite = Expr(:call, :!, trait0)  # generate the opposite
-            val = :(::Type{$trait})
+            val = :(::$(trait.args[1]))
         end
         # Get line info for better backtraces
         ln = findline(tfn)
@@ -378,7 +374,8 @@ let
         if !(key ∈ keys(dispatch_cache)) # define trait dispatch function
             if !haskwargs
                 ex = quote
-                    $fname{$(typs...)}($(args1...)) = (Base.@_inline_meta(); $fname($curmod.trait($trait),
+                    # TODO: remove the types here and use the instances instead
+                    $fname{$(typs_wo_assoc...)}($(args1...)) = (Base.@_inline_meta(); $fname($trait_wo_assoc,
                                                                                     $(strip_tpara(strip_kw(args1))...)
                                                                                     )
                                                        )
@@ -386,7 +383,7 @@ let
                 end
             else
                 ex = quote
-                    $fname{$(typs...)}($(args1...);kwargs...) = (Base.@_inline_meta(); $fname($curmod.trait($trait),
+                    $fname{$(typs_wo_assoc...)}($(args1...);kwargs...) = (Base.@_inline_meta(); $fname($trait_wo_assoc,
                                                                                               $(strip_tpara(strip_kw(args1))...);
                                                                                               kwargs...
                                                                                               )
@@ -410,42 +407,54 @@ let
             end
             delete!(dispatch_cache, key) # permits function redefinition if that's what we want
         end
-        ex
+        return ex
     end
 end
-
 """
 Defines a function dispatching on a trait. Examples:
 
 ```julia
-@traitfn f{X;  Tr1{X}}(x::X,y) = ...
-@traitfn f{X; !Tr1{X}}(x::X,y) = ...
+@traitfn f{X;  Tr1(X)}(x::X,y) = ...
+@traitfn f{X; !Tr1(X)}(x::X,y) = ...
 
-@traitfn f{X,Y;  Tr2{X,Y}}(x::X,y::Y) = ...
-@traitfn f{X,Y; !Tr2{X,Y}}(x::X,y::Y) = ...
+@traitfn f{X,Y;  Tr2(X,Y)}(x::X,y::Y) = ...
+@traitfn f{X,Y; !Tr2(X,Y)}(x::X,y::Y) = ...
+```
+or using Traitor-style syntax:
+```
+@traitfn f(x::::Tr1, y) = ...
+@traitfn f(x::::(!Tr1), y) = ...
 ```
 
-Note that the second example is just syntax sugar for `@traitfn f{X,Y; Not{Tr1{X,Y}}}(x::X,y::Y) = ...`.
+Note that the second example is just syntax sugar for
+`@traitfn f{X,Y; Not{Tr1{X,Y}}}(x::X,y::Y) = ...`.
 """
 macro traitfn(tfn)
     esc(traitfn(tfn))
 end
-=#
+
 ######
 ## Helpers
 ######
 
 # true if :(!(Tr{x}))
 function isnegated(t::Expr)
-    if t.head==:call
-        if t.args[1]==:!
-            return true
-        elseif t.args[1] isa Expr && t.args[1].head==:curly && t.args[1].args[1]==:Not
-            return true
-        else
-            return false
-        end
+    out = @match t begin
+        !Tr_{P__}() => true
+        Tr_{P__}() => false
+        !Tr_{P__} => true
+        Tr_{P__} => false
+        Not{Tr_{P__}}() => true
+        Not{Tr_{P__}} => true
+        !Tr_() => true
+        Tr_() => false
+        !Tr_ => true
+        Tr_ => false
+        Not{Tr_}() => true
+        Not{Tr_} => true
     end
+    out==nothing && error("Wat! A bug!")
+    return out
 end
 isnegated(t::Symbol) = false
 
