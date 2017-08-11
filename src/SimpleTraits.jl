@@ -15,8 +15,6 @@ export Trait, istrait, @traitdef, @traitimpl, @traitfn, Not, @check_fast_traitdi
 ## @doc """
 ## `abstract Trait{SUPER}`
 
-@compat abstract type Trait end #{SUPER}
-
 """
 All Traits are subtypes of abstract type Trait.
 
@@ -30,48 +28,18 @@ where X and Y are the types involved in the trait.
 (SUPER is not used here but in Traits.jl, thus retained for possible
 future compatibility.)
 """
-Trait
-
-@compat abstract type Not{T<:Trait} <: Trait end
+abstract type Trait end #{SUPER}
 
 """
 The set of all types not belonging to a trait is encoded by wrapping
 it with Not{}, e.g.  Not{Tr1{X,Y}}
 """
-Not
+struct Not{T<:Trait} <: Trait end
 
-# Helper to strip an even number of Not{}s off: Not{Not{T}}->T
-stripNot{T<:Trait}(::Type{T}) = T
-stripNot{T<:Trait}(::Type{Not{T}}) = Not{T}
-stripNot{T<:Trait}(::Type{Not{Not{T}}}) = stripNot(T)
-
-"""
-A trait is defined as full-filled if this function is the identity
-function for that trait.  Otherwise it returns the trait wrapped in
-`Not`.
-
-Example:
-```
-trait(IsBits{Int}) # returns IsBits{Int}
-trait(IsBits{Array}) # returns Not{IsBits{Array}}
-```
-
-Usually this function is defined when using the `@traitimpl` macro.
-
-However, instead of using `@traitimpl` one can define a method for
-`trait` to implement a trait, see the README.
-"""
-trait{T<:Trait}(::Type{T}) = Not{T}
-trait{T<:Trait}(::Type{Not{T}}) = trait(T)
-
-## Under the hood, a trait is then implemented for specific types by
-## defining:
-#   trait(::Type{Tr1{Int,Float64}}) = Tr1{Int,Float64}
-# or
-#   trait{I<:Integer,F<:FloatingPoint}(::Type{Tr1{I,F}}) = Tr1{I,F}
-#
-# Note due to invariance, this does probably not the right thing:
-#   trait(::Type{Tr1{Integer,FloatingPoint}}) = Tr1{Integer, FloatingPoint}
+# # Helper to strip an even number of Not{}s off: Not{Not{T}}->T
+# stripNot{T<:Trait}(::Type{T}) = T
+# stripNot{T<:Trait}(::Type{Not{T}}) = Not{T}
+# stripNot{T<:Trait}(::Type{Not{Not{T}}}) = stripNot(T)
 
 """
 This function checks whether a trait is fulfilled by a specific
@@ -81,8 +49,9 @@ istrait(Tr1{Int,Float64}) => return true or false
 ```
 """
 istrait(::Any) = error("Argument is not a Trait.")
-istrait{T<:Trait}(tr::Type{T}) = trait(tr)==stripNot(tr) ? true : false # Problem, this can run into issue #265
-                                                                        # thus is redefine when traits are defined
+istrait(::Not) = false
+istrait(::Trait) = true
+
 """
 
 Used to define a trait.  Traits, like types, are camel cased.  I
@@ -98,12 +67,43 @@ when there is a "contract" between several types.
 
 Examples:
 ```julia
-@traitdef IsFast{X}
-@traitdef IsSlow{X,Y}
+@traitdef IsFast(X)
+@traitdef IsSlow(X,Y)
+@traitdef LikeArray{T,N}(Ar) # with associated types
 ```
 """
+function _traitdef(tr)
+    Tr, A, T = @match tr begin
+        (
+            Tr_{A__}(T__)
+            |
+            Tr_(T__)
+        ) => (Tr, A, T)
+    end
+    # make default constructors
+    f1 = :( $(esc(Tr))(::Any...) = (l=$(length(T)); error("This is a $l-type trait") ) )
+    args = [:(::Any) for i=1:length(T)]
+    f2 = :($(esc(Tr))($(args...)) = Not{$(esc(Tr))}())
+    if A==nothing
+        return quote
+            struct $(esc(Tr)) <: Trait end
+            $f1
+            $f2
+        end
+    else
+        tmp = esc(:($Tr{$(A...)}))
+        tmp2 = map(esc,A)
+        f3 = :($tmp($(args...)) where {$(tmp2...)} = Not{$tmp}())
+        return quote
+            struct $tmp <: Trait end
+            $f1
+            $f2
+            $f3
+        end
+    end
+end
 macro traitdef(tr)
-    :(immutable $(esc(tr)) <: Trait end)
+    _traitdef(tr)
 end
 
 """
