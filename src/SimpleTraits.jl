@@ -1,6 +1,7 @@
 __precompile__()
 
 module SimpleTraits
+using Base.Iterators
 using MacroTools
 using Compat
 const curmod = module_name(current_module())
@@ -22,13 +23,11 @@ A concrete Trait will look like:
 ```julia
 immutable Tr1{X,Y} <: Trait end
 ```
-where X and Y are the types involved in the trait.
+where X and Y are the associated types of the trait.
 
-
-(SUPER is not used here but in Traits.jl, thus retained for possible
-future compatibility.)
+(Not, as before the types involved in the trait.)
 """
-abstract type Trait end #{SUPER}
+abstract type Trait end
 
 """
 The set of all types not belonging to a trait is encoded by wrapping
@@ -58,12 +57,23 @@ Used to define a trait.  Traits, like types, are camel cased.  I
 suggest to start them with a verb, e.g. `IsImmutable`, to distinguish
 them from actual types, which are usually nouns.
 
-Traits need to have one or more (type-)parameters to specify the type
-to which the trait is applied.  For instance `IsImmutable{Int}`
-signifies that `Int` is part of `IsImmutable` (although whether that
-is true needs to be checked with the `istrait` function).  Most traits
-will be one-parameter traits, however, several parameters are useful
-when there is a "contract" between several types.
+Traits need to have one or more (type-)parameters to specify the type to which
+the trait is applied, these go in parentheise `(...)`.  For instance `@traitdef
+IsImmutable(T)`.  When actually calling the constructor `IsImmutable(MyType)`,
+then it will return `IsImmutable()`, if `MyType` is part of the trait or
+`Not{IsImmutable}()` otherwise. Most traits will be one-type-parameter traits,
+however, several type-parameters are useful when there is a "contract" between
+several types.
+
+Additionally, traits can have associated types, which are very similar to
+type-parameters of ordinary types.  For instance if we wanted a iterator-trait
+which can also be used to dispatch on the type of the iterated values, we may
+want something like `@traitdef IsIterator{ElType}(X)`.  Now (once implemented
+correctly), `IsIterator([1,2])` would return `IsIterator{Int}()`, signifiying
+that the iteration would be over `Int`s.
+
+Note that the trait-constructors can be called both with types and instances:
+`IsIterator([1,2])` and `IsIterator(Vector{Int})` both return `IsIterator{Int}()`.
 
 Examples:
 ```julia
@@ -81,24 +91,30 @@ function _traitdef(tr)
         ) => (Tr, A, T)
     end
     # make default constructors
-    f1 = :( $(esc(Tr))(::Any...) = (l=$(length(T)); error("This is a $l-type trait") ) )
-    args = [:(::Any) for i=1:length(T)]
-    f2 = :($(esc(Tr))($(args...)) = Not{$(esc(Tr))}())
+    trname = esc(Tr)
+    f1 = :( $trname(::Any...) = (len=$(length(T)); error("This is a $len-type trait") ) )
+    args = [:(::Type) for i=1:length(T)]
+    f2 = :($trname($(args...)) = Not{$trname}()) # default: not belonging to trait
+    args = [:(tv) for tv in take(GenerateTypeVars{:lcase}(),length(T))]
+    tpof = [:(typeof(tv)) for tv in take(GenerateTypeVars{:lcase}(),length(T))]
+    f3 = :($trname($(args...)) = $trname($(tpof...))) # convert instances to types
     if A==nothing
         return quote
-            struct $(esc(Tr)) <: Trait end
+            struct $trname <: Trait end
             $f1
             $f2
+            $f3
         end
     else
         tmp = esc(:($Tr{$(A...)}))
         tmp2 = map(esc,A)
-        f3 = :($tmp($(args...)) where {$(tmp2...)} = Not{$tmp}())
+        f4 = :($tmp($(args...)) where {$(tmp2...)} = Not{$tmp}())
         return quote
             struct $tmp <: Trait end
             $f1
             $f2
             $f3
+            $f4
         end
     end
 end
@@ -112,88 +128,132 @@ not belong to a trait.
 
 Example:
 ```julia
-@traitdef IsFast{X}
-@traitimpl IsFast{Array{Int,1}}
+@traitdef IsFast(X)
+@traitimpl IsFast(Array{Int,1})
+@traitimpl IsFast(Array{T,2}) where T
 ```
+where the last one shows how use `where` for free type-parameters.
 
 Often a trait is dependent on some check-function returning true or
 false.  This can be done with:
 ```julia
-@traitimpl IsFast{T} <- isfast(T)
+@traitimpl IsFast(T) <- isfast(T)
 ```
 where `isfast` is that check-function.
 
 Note that traits implemented with the former of above methods will
 override an implementation with the latter method.  Thus it can be
 used to define exceptions to the rule.
+
+When there are associated types, these need to be specifed too:
+```julia
+@traitdef IsIterator{T}(X)
+@traitimpl IsIterator{Int}(Array{Int,1})
+@traitimpl IsIterator{T}(Array{T}) where T
+```
+(depending on the type involved the order of `{T,N}` maybe different).`
+
+TODO:
+
+```julia
+@traitimpl LikeArray{T,N}(AR) <- likearray(AR)
+```
+where `likearray` is that check-function, which now also needs to return a type
+tuple `{T,N}` as second argument.
+
+Note that also negated traits can be implemented, say to make an exception to a
+rule: `@traitimpl Not{IsFast}(Array{Float64,1})`.`
+
 """
 macro traitimpl(tr)
-    if tr.head==:curly || (tr.head==:call && tr.args[1]==:!)
-        # makes
-        # trait{X1<:Int,X2<:Float64}(::Type{Tr1{X1,X2}}) = Tr1{X1,X2}
-        if tr.args[1]==:Not || isnegated(tr)
-            tr = tr.args[2]
-            negated = true
+    if tr.head==:where
+        Ps = tr.args[2:end]
+        ps = map(esc, Ps)
+        tr = tr.args[1]
+        haswhere = true
+    else
+        haswhere = false
+    end
+    if tr.head==:call && tr.args[1]!=:<
+        out = @match tr begin
+            (   (
+                Not{Tr_{A__}}(T__)
+                )|(
+                !Tr_{A__}(T__)
+                )|(
+                Not{Tr_}(T__)
+                )|(
+                Tr_{A__}(T__)
+                )|(
+                !Tr_(T__)
+                )|(
+                Tr_(T__)
+                )
+            ) => (Tr, A, T)
+        end
+        if out==nothing
+            error("Could not parse $tr")
         else
-            negated = false
+            Tr, A, Typs = out
         end
-        typs = tr.args[2:end]
-        trname = esc(tr.args[1])
-        curly = Any[]
-        paras = Any[]
-        for (ty,v) in zip(typs, GenerateTypeVars{:upcase}())
-            push!(curly, Expr(:(<:), esc(v), esc(ty)))  #:($v<:$ty)
-            push!(paras, esc(v))
+        hasassoc = A!=nothing
+        trname = esc(Tr)
+        typs = [:(::Type{$T}) for T in Typs]
+        typs = map(esc, typs)
+
+        if !hasassoc
+            if !isnegated(tr)
+                if haswhere
+                    return :( ( $trname($(typs...)) ) where {$(ps...)} = $trname() )
+                else
+                    return :( $trname($(typs...)) = $trname() )
+                end
+            else
+                if haswhere
+                    return :( $trname($(typs...)) where {$(ps...)} = Not{$trname}() )
+                else
+                    return :( $trname($(typs...)) = Not{$trname}() )
+                end
+            end
+        else # with associated types
+            assoc = map(esc, A)
+            if !isnegated(tr)
+                if haswhere
+                    return :( $trname($(typs...)) where {$(ps...)} = $trname{$(assoc...)}() )
+                else
+                    return :( $trname($(typs...)) = $trname{$(assoc...)}() )
+                end
+            else
+                if haswhere
+                    return :( $trname($(typs...)) where {$(ps...)} = Not{$trname{$(assoc...)}}() )
+                else
+                    return :( $trname($(typs...)) = Not{$trname{$(assoc...)}}() )
+                end
+            end
         end
-        arg = :(::Type{$trname{$(paras...)}})
-        fnhead = :($curmod.trait{$(curly...)}($arg))
-        isfnhead = :($curmod.istrait{$(curly...)}($arg))
         if !negated
             return quote
-                $fnhead = $trname{$(paras...)}
-                VERSION < v"0.6-" && ($isfnhead = true) # Add the istrait definition as otherwise
-                                                        # method-caching can be an issue.
+                $trname{$(paras...)} = $trname
                 nothing
             end
         else
             return quote
-                $fnhead = Not{$trname{$(paras...)}}
-                VERSION < v"0.6-" && ($isfnhead = false) # Add the istrait definition as otherwise
-                                                         # method-caching can be an issue.
+                Not{$trname{$(paras...)}} = $trname
                 nothing
             end
         end
-    elseif tr.head==:call
-        @assert tr.args[1]==:<
-        negated,Tr,P1,fn,P2 = @match tr begin
-            Not{Tr_{P1__}} <- fn_(P2__) => (true, Tr, P1, fn, P2)
-            Tr_{P1__} <- fn_(P2__) => (false, Tr, P1, fn, P2)
-        end
-        if negated
-            fn = Expr(:call, GlobalRef(SimpleTraits, :!), fn)
-        end
-        if VERSION < v"0.6-"
-            return esc(quote
-                           @generated function SimpleTraits.trait{$(P1...)}(::Type{$Tr{$(P1...)}})
-                               Tr = $Tr
-                               P1 = $P1
-                               return $fn($(P2...)) ? :($Tr{$(P1...)}) : :(Not{$Tr{$(P1...)}})
-                           end
-                           nothing
-                       end)
-        else
-            return esc(quote
-                           function SimpleTraits.trait{$(P1...)}(::Type{$Tr{$(P1...)}})
-                               return $fn($(P2...)) ? $Tr{$(P1...)} : Not{$Tr{$(P1...)}}
-                           end
-                           nothing
-                       end)
-        end
+    elseif tr.head==:call # @traitimpl IsFast(T) <- isfast(T)
+        error("not implemented yet")
     else
         error("Cannot parse $tr")
     end
 end
 
+macro traitfn(tfn)
+    nothing
+end
+
+#=
 # Defining a function dispatching on the trait (or not)
 # @traitfn f{X,Y;  Tr1{X,Y}}(x::X,y::Y) = ...
 # @traitfn f{X,Y; !Tr1{X,Y}}(x::X,y::Y) = ... # which is just sugar for:
@@ -370,13 +430,23 @@ Note that the second example is just syntax sugar for `@traitfn f{X,Y; Not{Tr1{X
 macro traitfn(tfn)
     esc(traitfn(tfn))
 end
-
+=#
 ######
 ## Helpers
 ######
 
 # true if :(!(Tr{x}))
-isnegated(t::Expr) = t.head==:call
+function isnegated(t::Expr)
+    if t.head==:call
+        if t.args[1]==:!
+            return true
+        elseif t.args[1] isa Expr && t.args[1].head==:curly && t.args[1].args[1]==:Not
+            return true
+        else
+            return false
+        end
+    end
+end
 isnegated(t::Symbol) = false
 
 # [:(x::X)] -> [:x]
@@ -430,12 +500,12 @@ function insertdummy(a::Expr)
 end
 
 # generates: X1, X2,... or x1, x2.... (just symbols not actual TypeVar)
-type GenerateTypeVars{CASE}
-end
+struct GenerateTypeVars{CASE} end
 Base.start(::GenerateTypeVars) = 1
 Base.next(::GenerateTypeVars{:upcase}, state) = (Symbol("X$state"), state+1) # X1,..
 Base.next(::GenerateTypeVars{:lcase}, state) = (Symbol("x$state"), state+1)  # x1,...
-Base.done(::GenerateTypeVars, state) = false
+Base.done(::GenerateTypeVars, state) = 10^6<state
+Base.length(::GenerateTypeVars) = 10^6
 
 ####
 # Annotating the source location
@@ -519,6 +589,6 @@ function llvm_lines(fn, args)
     count(c->c=='\n', String(io))
 end
 
-include("base-traits.jl")
+# include("base-traits.jl")
 
 end # module
