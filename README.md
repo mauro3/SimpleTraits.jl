@@ -19,9 +19,9 @@ background and a quick introduction to traits watch my 10min
 [JuliaCon 2015](https://youtu.be/j9w8oHfG1Ic) talk.
 
 One good example of the use of traits is the
-[abstract array interface](http://docs.julialang.org/en/release-0.5/manual/interfaces/#abstract-arrays)
+[abstract array interface](https://docs.julialang.org/en/stable/manual/interfaces/#man-interface-array-1)
 in Julia-Base.  An abstract array either belongs to the
-`Base.LinearSlow` or `Base.LinearFast` trait, depending on how its
+`Base.IndexLinear` or `Base.IndexCartesian` trait, depending on how its
 internal indexing works.  The advantage to use a trait there is that
 one is free to create a type hierarchy independent of this particular
 "trait" of the array(s).
@@ -61,15 +61,13 @@ If there is a function which tests whether a trait is fulfilled then
 it can be used like so:
 ```julia
 @traitimpl IsNice{X} <- isnice(X)
+isnice(X) = false # set default
 ```
 
 i.e. any type `X` for which `isnice(X)==true` belongs to `IsNice`.
 Notes:
 
-- on Julia-0.5 this generates a generated-function under the
-  hood and thus [restrictions](http://docs.julialang.org/en/release-0.5/manual/metaprogramming/#generated-functions)
-  on `isnice` apply.
-- on Julia-0.6 no generated function is used and overhead-less dispatch
+- overhead-less  (static) dispatch
   is only possible if `isnice` is *pure*: "[A pure method]
   promises that the result will always be the same constant regardless
   of when the method is called [for the same input arguments]."
@@ -145,9 +143,9 @@ the same default-argument with the *same values*.
 @traitfn deff(x::::(!Tr1), y=1) = x+y
 ```
 
-## Method overwritten warnings in Julia 0.5
+## Method overwritten warnings
 
-As of Julia 0.5 warnings are issued when methods are overwritten.  Due
+Warnings are issued when methods are overwritten.  Due
 to Tim's trick the `@traitfn` needs to create two functions the first
 time it is used for a particular method (see next section for an
 explanation).  But when defining the opposite trait, then better only
@@ -198,8 +196,7 @@ fn(Float32(5)) # -> MethodError; method defined in previous example
                #    was overwritten above
 ```
 This last definition of `fn` just overwrites the definition `@traitfn
-f{X; Tr{X}}(x::X) = 2` from above.  In Julia 0.5 this gives a nice
-warning though.
+f{X; Tr{X}}(x::X) = 2` from above.
 
 If you need to dispatch on several traits in a single trait-method,
 then you're out of luck.  But please voice your grievance over in pull
@@ -250,9 +247,12 @@ checkfn(x) = rand()>0.5 ? true : false # a bit crazy!
 # this tests a trait-function with TestTr{String} and will
 # also prints number of LLCM-IR lines of trait vs normal function:
 @check_fast_traitdispatch TestTr String true
+
+# Now this is fast:
+@traitimpl TestTr{String}
+@check_fast_traitdispatch TestTr String true
 ```
-Note that this example only works in Julia 0.6, in Julia 0.5 it
-produces just wrong results.
+
 
 ## Advanced features
 
@@ -273,21 +273,20 @@ directly.  Note that anything but a constant function will probably
 not be inlined away by the JIT and will lead to slower dynamic
 dispatch (see `@check_fast_traitdispatch` for a helper to check).
 
-Example leading to dynamic dispatch in Julia 0.5 (but works well in
-Julia 0.6):
+Example leading to static dispatch (since Julia 0.6):
 ```julia
 @traitdef IsBits{X}
 SimpleTraits.trait{X1}(::Type{IsBits{X1}}) = isbits(X1) ? IsBits{X1} : Not{IsBits{X1}}
 istrait(IsBits{Int}) # true
 istrait(IsBits{Array{Int,1}}) # false
-immutable A
+struct A
     a::Int
 end
 istrait(IsBits{A}) # true
 ```
 
 Dynamic dispatch can be avoided using a generated
-function or *pure* functions in Julia-0.6 (sometimes they need to be
+function or *pure* functions (sometimes they need to be
 annotated with `Base.@pure`):
 ```julia
 @traitdef IsBits{X}
@@ -301,24 +300,17 @@ In particular (in Julia 0.6), no methods which are defined after the
 generated function are allowed to be called inside the generated
 function, otherwise
 [this](https://github.com/JuliaLang/julia/issues/21356) issue is
-encountered.
+encountered.  Generally, try pure functions first and only in a pinch
+generated functions.
 
 Note that these programmed-traits can be combined with `@traitimpl IsBits{XYZ}`,
 i.e. program the general case and add exceptions with `@traitimpl IsBits{XYZ}`.
 
-Trait-inheritance can also be hand-coded with above trick, in Julia 0.5.  For
+Trait-inheritance can also be hand-coded with above trick.  For
 instance, the trait given by (in pseudo syntax) `BeautyAndBeast{X,Y} <: IsNice{X},
 !IsNice{Y}, BelongTogether{X,Y}`:
 ```julia
 @traitdef BeautyAndBeast{X,Y}
-@generated function SimpleTraits.trait{X,Y}(::Type{BeautyAndBeast{X,Y}})
-    if istrait(IsNice{X}) && !istrait(IsNice{Y}) && BelongTogether{X,Y}
-        :(BeautyAndBeast{X,Y})
-    else
-        :(Not{BeautyAndBeast{X,Y}})
-    end
-end
-# or in 0.6
 function SimpleTraits.trait{X,Y}(::Type{BeautyAndBeast{X,Y}})
     if istrait(IsNice{X}) && !istrait(IsNice{Y}) && BelongTogether{X,Y}
         BeautyAndBeast{X,Y}
@@ -327,9 +319,10 @@ function SimpleTraits.trait{X,Y}(::Type{BeautyAndBeast{X,Y}})
     end
 end
 ```
-Note that in Julia 0.6, this will lead to slower, dynamic dispatch, as
-the latter function is not pure (it depends on the global state of
-which types belong to the traits `IsNice` and `BelongTogether`).
+Note that this will lead to slower, dynamic dispatch, as
+the function is not pure (it depends on the global state of
+which types belong to the traits `IsNice` and `BelongTogether`).  (In
+Julia 0.5 one could use a generated function but not anymore in Julia 0.6.)
 
 
 Note also that trait functions can be generated functions:
@@ -344,7 +337,7 @@ does. Here the edited output of running it for the macros of this package:
 ```julia
 julia> macroexpand(:(@traitdef Tr{X}))
 
-immutable Tr{X} <: SimpleTraits.Trait
+struct Tr{X} <: SimpleTraits.Trait
 end
 
 julia> macroexpand(:(@traitimpl Tr{Int}))
@@ -383,8 +376,8 @@ Example, dispatch on whether an argument is immutable or not:
 @traitfn f{X; !IsImmutable{X}}(x::X) = (x.fld += 1; x) # update in-place
 
 # use
-type A; fld end
-immutable B; fld end
+mutable struct A; fld end
+struct B; fld end
 a=A(1)
 f(a) # in-place
 @assert a.fld == A(2).fld
@@ -450,11 +443,6 @@ If anyone fancies a go at writing this companion package, I would be
 very happy to help and contribute.  After the
 [type-system overhaul](https://github.com/JuliaLang/julia/pull/18457)
 lands, this should be much less hackish than what's in Traits.jl.
-
-# Misc
-
-Note that Julia 0.3 is only supported up to tag
-[v0.0.1](https://github.com/mauro3/SimpleTraits.jl/tree/v0.0.1).
 
 # References
 
