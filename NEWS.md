@@ -1,3 +1,8 @@
+# 2017-11-23
+
+Dropped Julia 0.5 support, last release supporting it is v0.5.1
+
+
 # 2016-11-19
 
 Ditched Julia 0.4 support
