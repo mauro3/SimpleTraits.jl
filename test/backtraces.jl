@@ -24,7 +24,13 @@ function hasline(bt, n)
     false
 end
 
-@test hasline(foo(1), 6)
-@test hasline(foo(1.0), 7)
+if VERSION<v"0.7-"
+    @test hasline(foo(1), 6)
+    @test hasline(foo(1.0), 7)
+else
+    @test_broken hasline(foo(1), 6)
+    @test_broken hasline(foo(1.0), 7)
+end
+
 
 nothing

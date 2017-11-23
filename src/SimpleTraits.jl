@@ -2,7 +2,8 @@ __precompile__()
 
 module SimpleTraits
 using MacroTools
-const curmod = module_name(current_module())
+using Compat
+const curmod = module_name(@__MODULE__)
 
 # This is basically just adding a few convenience functions & macros
 # around Holy Traits.
@@ -21,7 +22,7 @@ All Traits are subtypes of abstract type Trait.
 
 A concrete Trait will look like:
 ```julia
-immutable Tr1{X,Y} <: Trait end
+struct Tr1{X,Y} <: Trait end
 ```
 where X and Y are the types involved in the trait.
 
@@ -102,7 +103,7 @@ Examples:
 ```
 """
 macro traitdef(tr)
-    :(immutable $(esc(tr)) <: Trait end)
+    :(struct $(esc(tr)) <: Trait end)
 end
 
 """
@@ -193,7 +194,8 @@ let
         if tfn.head==:macrocall
             hasmac = true
             mac = tfn.args[1]
-            tfn = tfn.args[2]
+            # https://github.com/JuliaLang/julia/pull/23885
+            tfn = VERSION<v"0.7-" ? tfn.args[2] : tfn.args[3]
         else
             hasmac = false
         end
@@ -262,8 +264,8 @@ let
             end
             args1 = deepcopy(args0)
             if vararg
-                args0[i] = arg==nothing ? nothing : :($arg...).args[1]
-                args1[i] = arg==nothing ? :(::$typ...).args[1] : :($arg::$typ...).args[1]
+                args0[i] = arg==nothing ? nothing : :($arg...,).args[1]
+                args1[i] = arg==nothing ? :(::$typ...,).args[1] : :($arg::$typ...,).args[1]
             else
                 args0[i] = arg==nothing ? nothing : :($arg)
                 args1[i] = arg==nothing ? :(::$typ) : :($arg::$typ)
@@ -298,7 +300,7 @@ let
         end
         # Create the trait dispatch function
         ex = fn
-        key = (current_module(), fname, typs0, strip_kw(args0), trait0_opposite)
+        key = (@__MODULE__, fname, typs0, strip_kw(args0), trait0_opposite)
         if !(key ∈ keys(dispatch_cache)) # define trait dispatch function
             if !haskwargs
                 ex = quote
@@ -414,8 +416,7 @@ function insertdummy(a::Expr)
 end
 
 # generates: X1, X2,... or x1, x2.... (just symbols not actual TypeVar)
-type GenerateTypeVars{CASE}
-end
+struct GenerateTypeVars{CASE} end
 Base.start(::GenerateTypeVars) = 1
 Base.next(::GenerateTypeVars{:upcase}, state) = (Symbol("X$state"), state+1) # X1,..
 Base.next(::GenerateTypeVars{:lcase}, state) = (Symbol("x$state"), state+1)  # x1,...
@@ -500,7 +501,7 @@ function llvm_lines(fn, args)
     io = IOBuffer()
     Base.code_llvm(io, fn, args)
     #Base.code_native(io, fn, args)
-    count(c->c=='\n', String(io))
+    count(c->c=='\n', String(take!(copy(io))))
 end
 
 include("base-traits.jl")

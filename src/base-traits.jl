@@ -26,9 +26,18 @@ Base.@pure _isimmutable(X) = !X.mutable
 @traitdef IsCallable{X}
 @traitimpl IsCallable{X} <- (X->(X<:Function ||  length(methods(X))>0))(X)
 
-"Trait of all leaf types types"
-@traitdef IsLeafType{X}
-@traitimpl IsLeafType{X} <- isleaftype(X)
+if VERSION<v"0.7-"
+    "Trait of all leaf types types"
+    @traitdef IsLeafType{X}
+    @traitimpl IsLeafType{X} <- isleaftype(X)
+else
+    export IsConcrete
+    "Trait of all concrete types types"
+    @traitdef IsConcrete{X}
+    @traitimpl IsConcrete{X} <- isconcrete(X)
+
+    Base.@deprecate_binding IsLeafType IsConcrete
+end
 
 "Types which have contiguous memory layout"
 @traitdef IsContiguous{X} # https://github.com/JuliaLang/julia/issues/10889
@@ -47,6 +56,8 @@ function isindexlinear(X)
 end
 @traitimpl IsIndexLinear{X} <- isindexlinear(X)
 
+Base.@deprecate_binding IsFastLinearIndex IsIndexLinear
+
 # TODO
 ## @traitdef IsArray{X} # use for any array like type in the sense of container
 ##                   # types<:AbstractArray are automatically part
@@ -54,8 +65,6 @@ end
 ## @traitdef IsMartix{X} # use for any LinearOperator
 ##                    # types<:AbstractArray are automatically part
 
-
-Base.@deprecate_binding IsFastLinearIndex IsIndexLinear
 
 "Trait of all iterator types"
 @traitdef IsIterator{X}

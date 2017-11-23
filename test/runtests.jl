@@ -44,8 +44,8 @@ const trait = SimpleTraits.trait
 
 # issue 9
 abstract type A9 end
-type B9<:A9 end
-type C9<:A9 end
+struct B9<:A9 end
+struct C9<:A9 end
 @traitdef Tr9{X}
 @traitimpl Tr9{A9}
 @traitimpl Not{Tr9{B9}}
@@ -189,16 +189,16 @@ type C9<:A9 end
 # traitfn with macro
 @traitfn @inbounds gg{X; Tr1{X}}(x::X) = x
 @test gg(5)==5
-@traitfn @generated ggg{X; Tr1{X}}(x::X) = X<:AbstractArray ? :(x+1) : :(x)
+@traitfn @generated ggg{X; Tr1{X}}(x::X) = X<:AbstractArray ? :(x+x) : :(x)
 @test ggg(5)==5
 @traitimpl Tr1{AbstractArray}
-@test ggg([5])==[6]
+@test ggg([5])==[10]
 
 @traitfn @inbounds ggt(x::::Tr1) = x
 @test ggt(5)==5
-@traitfn @generated gggt{X}(x::X::Tr1) = X<:AbstractArray ? :(x+1) : :(x)
+@traitfn @generated gggt{X}(x::X::Tr1) = X<:AbstractArray ? :(x+x) : :(x)
 @test gggt(5)==5
-@test gggt([5])==[6]
+@test gggt([5])==[10]
 
 
 # traitfn with Type

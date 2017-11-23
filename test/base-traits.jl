@@ -26,7 +26,7 @@ c = view(a, 1:2:5)
 @test istrait(IsIndexLinear{Vector})
 @test !istrait(IsIndexLinear{AbstractArray})
 
-type T9867 end
+struct T9867 end
 @test istrait(IsCallable{T9867})
 
 @test istrait(IsIterator{Array})
