@@ -1,7 +1,6 @@
 module BaseTraits
 using SimpleTraits
 
-using Compat
 
 export IsLeafType, IsBits, IsImmutable, IsContiguous, IsIndexLinear,
        IsAnything, IsNothing, IsCallable, IsIterator

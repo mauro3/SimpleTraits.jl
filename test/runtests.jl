@@ -1,5 +1,4 @@
 using SimpleTraits
-using Compat
 using Base.Test
 
 const trait = SimpleTraits.trait
@@ -44,7 +43,7 @@ const trait = SimpleTraits.trait
 @test trait(Tr2{Int, Float32})==Not{Tr2{Int, Float32}}
 
 # issue 9
-@compat abstract type A9 end
+abstract type A9 end
 type B9<:A9 end
 type C9<:A9 end
 @traitdef Tr9{X}
@@ -81,21 +80,12 @@ type C9<:A9 end
 
 # This will overwrite the definition def1 above
 
-VERSION<v"0.6-dev" && println("\nOne warning expected:")
 @traitfn f{X; !Tr2{X,X}}(x::X) = 10
 @traitfn f{X; Tr2{X,X}}(x::X) = 100
 @test f(5)==10
 @test f(5.)==10
 @traitimpl Tr2{Integer, Integer}
 @test f(5.)==10
-
-# Needed to update method cache (but not in 0.6 as #265 got fixed):
-if VERSION<v"0.6.0-dev.1671" # https://github.com/JuliaLang/julia/pull/17057
-    @test !(f(5)==100)
-    println("\nTwo warnings expected:")
-    @traitfn f{X; Tr2{X,X}}(x::X) = 100
-    println("")
-end
 @test f(5)==100
 @test f(5.)==10
 

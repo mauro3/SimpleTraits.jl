@@ -2,7 +2,6 @@ __precompile__()
 
 module SimpleTraits
 using MacroTools
-using Compat
 const curmod = module_name(current_module())
 
 # This is basically just adding a few convenience functions & macros
@@ -15,7 +14,7 @@ export Trait, istrait, @traitdef, @traitimpl, @traitfn, Not, @check_fast_traitdi
 ## @doc """
 ## `abstract Trait{SUPER}`
 
-@compat abstract type Trait end #{SUPER}
+abstract type Trait end #{SUPER}
 
 """
 All Traits are subtypes of abstract type Trait.
@@ -32,7 +31,7 @@ future compatibility.)
 """
 Trait
 
-@compat abstract type Not{T<:Trait} <: Trait end
+abstract type Not{T<:Trait} <: Trait end
 
 """
 The set of all types not belonging to a trait is encoded by wrapping
@@ -151,15 +150,11 @@ macro traitimpl(tr)
         if !negated
             return quote
                 $fnhead = $trname{$(paras...)}
-                VERSION < v"0.6-" && ($isfnhead = true) # Add the istrait definition as otherwise
-                                                        # method-caching can be an issue.
                 nothing
             end
         else
             return quote
                 $fnhead = Not{$trname{$(paras...)}}
-                VERSION < v"0.6-" && ($isfnhead = false) # Add the istrait definition as otherwise
-                                                         # method-caching can be an issue.
                 nothing
             end
         end
@@ -172,23 +167,12 @@ macro traitimpl(tr)
         if negated
             fn = Expr(:call, GlobalRef(SimpleTraits, :!), fn)
         end
-        if VERSION < v"0.6-"
-            return esc(quote
-                           @generated function SimpleTraits.trait{$(P1...)}(::Type{$Tr{$(P1...)}})
-                               Tr = $Tr
-                               P1 = $P1
-                               return $fn($(P2...)) ? :($Tr{$(P1...)}) : :(Not{$Tr{$(P1...)}})
-                           end
-                           nothing
-                       end)
-        else
-            return esc(quote
-                           function SimpleTraits.trait{$(P1...)}(::Type{$Tr{$(P1...)}})
-                               return $fn($(P2...)) ? $Tr{$(P1...)} : Not{$Tr{$(P1...)}}
-                           end
-                           nothing
-                       end)
-        end
+        return esc(quote
+                   function SimpleTraits.trait{$(P1...)}(::Type{$Tr{$(P1...)}})
+                   return $fn($(P2...)) ? $Tr{$(P1...)} : Not{$Tr{$(P1...)}}
+                   end
+                   nothing
+                   end)
     else
         error("Cannot parse $tr")
     end
