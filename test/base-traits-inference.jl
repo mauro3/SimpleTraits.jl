@@ -5,7 +5,7 @@
 # Dict with base-traits to check using value[1] as type and value[2]
 # as number of lines allowed in llvm code
 cutoff = 5
-basetrs = [VERSION<v"0.7-" ? :IsLeafType=>:Int : :IsConcrete=>:Int,
+basetrs = [:IsConcrete=>:Int,
            :IsBits=>:Int,
            :IsImmutable=>:Int,
            :IsContiguous=>:(SubArray{Int64,1,Array{Int64,1},Tuple{Array{Int64,1}},false}),

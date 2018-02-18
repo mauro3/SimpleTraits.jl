@@ -1,5 +1,4 @@
 using SimpleTraits.BaseTraits
-using Compat: view
 
 @test istrait(IsAnything{Any})
 @test istrait(IsAnything{Union{}})

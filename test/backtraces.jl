@@ -3,8 +3,8 @@
 
 @traitimpl BacktraceTr{Integer}
 
-@traitfn foo{X;  BacktraceTr{X}}(A::X) = backtrace()
-@traitfn foo{X; !BacktraceTr{X}}(A::X) = backtrace()
+@traitfn foo(A::X) where {X;  BacktraceTr{X}} = backtrace()
+@traitfn foo(A::X) where {X; !BacktraceTr{X}} = backtrace()
 ###### END:   LINE NUMBER SENSITIVITY ##########
 # (the tests below depend on the particular line numbers in the code above)
 

@@ -1,3 +1,8 @@
+# 2018-02-19
+
+Transitioned to where-function syntax.  Dropped Julia 0.6 support,
+with the last release supporting it v0.5.2.
+
 # 2017-11-23
 
 Dropped Julia 0.5 support, last release supporting it is v0.5.1
