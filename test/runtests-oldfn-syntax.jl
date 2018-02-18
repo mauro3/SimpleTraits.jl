@@ -60,8 +60,8 @@ struct C9<:A9 end
 # Trait functions
 #################
 # functions with `t` postfix are the same as previous ones but using Traitor syntax
-@traitfn f(x::X) where {X; Tr1{X}} = 1  # def 1
-@traitfn f(x::X) where {X; !Tr1{X}} = 2
+@traitfn f{X; Tr1{X}}(x::X) = 1  # def 1
+@traitfn f{X; !Tr1{X}}(x::X) = 2
 @test f(5)==1
 @test f(5.)==2
 
@@ -71,34 +71,34 @@ struct C9<:A9 end
 @test ft(5.)==2
 
 
-@traitfn f(x::X,y::Y,z) where {X,Y; Tr2{X,Y}} = 1
+@traitfn f{X,Y; Tr2{X,Y}}(x::X,y::Y,z) = 1
 @test f(5,5., "a")==1
 @test_throws MethodError f(5,5, "a")==2
-@traitfn f(x::X,y::Y,z) where {X,Y; !Tr2{X,Y}} = 2
+@traitfn f{X,Y; !Tr2{X,Y}}(x::X,y::Y,z) = 2
 @test f(5,5, "a")==2
 # Note, two argument traits have no Traitor style syntax
 
 # This will overwrite the definition def1 above
 
-@traitfn f(x::X) where {X; !Tr2{X,X}} = 10
-@traitfn f(x::X) where {X; Tr2{X,X}} = 100
+@traitfn f{X; !Tr2{X,X}}(x::X) = 10
+@traitfn f{X; Tr2{X,X}}(x::X) = 100
 @test f(5)==10
 @test f(5.)==10
 @traitimpl Tr2{Integer, Integer}
 @test f(5.)==10
-@test f(5)==100
+@test_broken f(5)==100
 @test f(5.)==10
 
 # VarArg
-@traitfn vara(x::X, y...) where {X; Tr1{X}} = y
-@traitfn vara(x::X, y...) where {X; !Tr1{X}} = x
+@traitfn vara{X; Tr1{X}}(x::X, y...) = y
+@traitfn vara{X; !Tr1{X}}(x::X, y...) = x
 @test vara(5, 7, 8)==(7,8)
 @test vara(5.0, 7, 8)==5.0
-@traitfn vara2(x::X...) where {X; Tr1{X}} = x
+@traitfn vara2{X; Tr1{X}}(x::X...) = x
 @test vara2(5, 7, 8)==(5, 7, 8)
 @test_throws MethodError vara2(5, 7, 8.0)
 
-@traitfn vara3(::X...) where {X; Tr1{X}} = X
+@traitfn vara3{X; Tr1{X}}(::X...) = X
 @test vara3(5, 7, 8)==Int
 @test_throws MethodError vara3(5, 7, 8.0)
 
@@ -111,7 +111,7 @@ struct C9<:A9 end
 @test vara2t(5, 7, 8)==(5, 7, 8)
 @test_throws MethodError vara2t(5, 7, 8.0)
 
-@traitfn vara3t(::X::Tr1...) where {X} = X
+@traitfn vara3t{X}(::X::Tr1...) = X
 @test vara3t(5, 7, 8)==Int
 @test_throws MethodError vara3t(5, 7, 8.0)
 
@@ -175,8 +175,8 @@ struct C9<:A9 end
 @test defargs5(1.0,4)==(-1,())
 @test defargs5(1.0,k=10)==(9,())
 
-@traitfn defargs6(x::X=1, y=2) where {X;  Tr1{X}} = x+y
-@traitfn defargs6(x::X=1, y=2) where {X; !Tr1{X}} = x-y
+@traitfn defargs6{X;  Tr1{X}}(x::X=1, y=2) = x+y
+@traitfn defargs6{X; !Tr1{X}}(x::X=1, y=2) = x-y
 @test defargs6()==3
 @test defargs6(1,3)==4
 @test defargs6(1)==3
@@ -187,41 +187,41 @@ struct C9<:A9 end
 
 
 # traitfn with macro
-@traitfn @inbounds gg(x::X) where {X; Tr1{X}} = x
+@traitfn @inbounds gg{X; Tr1{X}}(x::X) = x
 @test gg(5)==5
-@traitfn @generated ggg(x::X) where {X; Tr1{X}} = X<:AbstractArray ? :(x+x) : :(x)
+@traitfn @generated ggg{X; Tr1{X}}(x::X) = X<:AbstractArray ? :(x+x) : :(x)
 @test ggg(5)==5
 @traitimpl Tr1{AbstractArray}
 @test ggg([5])==[10]
 
 @traitfn @inbounds ggt(x::::Tr1) = x
 @test ggt(5)==5
-@traitfn @generated gggt(x::X::Tr1) where {X} = X<:AbstractArray ? :(x+x) : :(x)
+@traitfn @generated gggt{X}(x::X::Tr1) = X<:AbstractArray ? :(x+x) : :(x)
 @test gggt(5)==5
 @test gggt([5])==[10]
 
 
 # traitfn with Type
-@traitfn ggt(::Type{X}, y) where {X; Tr1{X}} = (X,y)
+@traitfn ggt{X; Tr1{X}}(::Type{X}, y) = (X,y)
 @test ggt(Array, 5)==(Array, 5)
 # no equivalent with Traitor syntax
 
 # traitfn with ::X
-@traitfn gg27(::X) where {X; Tr1{X}} = X
+@traitfn gg27{X; Tr1{X}}(::X) = X
 @test gg27([1])==Array{Int,1}
 
-@traitfn gg27t(::X::Tr1) where {X} = X
+@traitfn gg27t{X}(::X::Tr1) = X
 @test gg27t([1])==Array{Int,1}
 
 ##
-@traitfn f11(x::Dict{T}) where {T<:Number;  Tr1{Dict{T}}} = 1
-@traitfn f11(x::Dict{T}) where {T<:Number; !Tr1{Dict{T}}} = 2
+@traitfn f11{T<:Number;  Tr1{Dict{T}}}(x::Dict{T}) = 1
+@traitfn f11{T<:Number; !Tr1{Dict{T}}}(x::Dict{T}) = 2
 @traitimpl Tr1{Dict{Int}}
 @test f11(Dict(1=>1))==1
 @test f11(Dict(5.5=>1))==2
 
-@traitfn f11t(x::Dict{T}::Tr1) where {T<:Number} = 1
-@traitfn f11t(x::Dict{T}::(!Tr1)) where {T<:Number} = 2
+@traitfn f11t{T<:Number}(x::Dict{T}::Tr1) = 1
+@traitfn f11t{T<:Number}(x::Dict{T}::(!Tr1)) = 2
 @test f11t(Dict(1=>1))==1
 @test f11t(Dict(5.5=>1))==2
 
@@ -244,31 +244,3 @@ isarrow(X) = eltype(X)<:Integer ? true : false
 @traitimpl Not{TrArrow2{X}} <- isarrow(X)
 @test !istrait(TrArrow2{Vector{Int}})
 @test istrait(TrArrow2{Vector{Float64}})
-
-####
-# issue with key in dispatch_cache
-@traitfn f_dc(::::Tr1) = 1
-module Mod
-using SimpleTraits
-using Base.Test
-@traitdef Tr1{X}
-@traitimpl Tr1{Integer}
-@traitfn f_dc(::::Tr1) = 2
-@test f_dc(1) == 2
-end
-
-######
-# Other tests
-#####
-include("base-traits.jl")
-include("base-traits-inference.jl")
-include("backtraces.jl")
-
-#####
-# Old function syntax
-####
-# throws lots of deprecation warnings!
-# TODO remove with Julia 0.7
-module OldFnSyntax
-include("runtests-oldfn-syntax.jl")
-end

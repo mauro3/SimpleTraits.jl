@@ -2,8 +2,9 @@ __precompile__()
 
 module SimpleTraits
 using MacroTools
-using Compat
-const curmod = module_name(@__MODULE__)
+const curmod = nameof(@__MODULE__)
+
+import InteractiveUtils
 
 # This is basically just adding a few convenience functions & macros
 # around Holy Traits.
@@ -41,9 +42,9 @@ it with Not{}, e.g.  Not{Tr1{X,Y}}
 Not
 
 # Helper to strip an even number of Not{}s off: Not{Not{T}}->T
-stripNot{T<:Trait}(::Type{T}) = T
-stripNot{T<:Trait}(::Type{Not{T}}) = Not{T}
-stripNot{T<:Trait}(::Type{Not{Not{T}}}) = stripNot(T)
+stripNot(::Type{T}) where {T<:Trait} = T
+stripNot(::Type{Not{T}}) where {T<:Trait} = Not{T}
+stripNot(::Type{Not{Not{T}}}) where {T<:Trait} = stripNot(T)
 
 """
 A trait is defined as full-filled if this function is the identity
@@ -61,14 +62,14 @@ Usually this function is defined when using the `@traitimpl` macro.
 However, instead of using `@traitimpl` one can define a method for
 `trait` to implement a trait, see the README.
 """
-trait{T<:Trait}(::Type{T}) = Not{T}
-trait{T<:Trait}(::Type{Not{T}}) = trait(T)
+trait(::Type{T}) where {T<:Trait} = Not{T}
+trait(::Type{Not{T}}) where {T<:Trait} = trait(T)
 
 ## Under the hood, a trait is then implemented for specific types by
 ## defining:
 #   trait(::Type{Tr1{Int,Float64}}) = Tr1{Int,Float64}
 # or
-#   trait{I<:Integer,F<:FloatingPoint}(::Type{Tr1{I,F}}) = Tr1{I,F}
+#   trait(::Type{Tr1{I,F}}) where {I<:Integer,F<:FloatingPoint} = Tr1{I,F}
 #
 # Note due to invariance, this does probably not the right thing:
 #   trait(::Type{Tr1{Integer,FloatingPoint}}) = Tr1{Integer, FloatingPoint}
@@ -81,7 +82,7 @@ istrait(Tr1{Int,Float64}) => return true or false
 ```
 """
 istrait(::Any) = error("Argument is not a Trait.")
-istrait{T<:Trait}(tr::Type{T}) = trait(tr)==stripNot(tr) ? true : false # Problem, this can run into issue #265
+istrait(tr::Type{T}) where {T<:Trait} = trait(tr)==stripNot(tr) ? true : false # Problem, this can run into issue #265
                                                                         # thus is redefine when traits are defined
 """
 
@@ -146,8 +147,8 @@ macro traitimpl(tr)
             push!(paras, esc(v))
         end
         arg = :(::Type{$trname{$(paras...)}})
-        fnhead = :($curmod.trait{$(curly...)}($arg))
-        isfnhead = :($curmod.istrait{$(curly...)}($arg))
+        fnhead = :($curmod.trait($arg) where {$(curly...)})
+        isfnhead = :($curmod.istrait($arg) where {$(curly...)})
         if !negated
             return quote
                 $fnhead = $trname{$(paras...)}
@@ -169,8 +170,8 @@ macro traitimpl(tr)
             fn = Expr(:call, GlobalRef(SimpleTraits, :!), fn)
         end
         return esc(quote
-                   function SimpleTraits.trait{$(P1...)}(::Type{$Tr{$(P1...)}})
-                   return $fn($(P2...)) ? $Tr{$(P1...)} : Not{$Tr{$(P1...)}}
+                   function SimpleTraits.trait(::Type{$Tr{$(P1...)}}) where {$(P1...)}
+                       return $fn($(P2...)) ? $Tr{$(P1...)} : Not{$Tr{$(P1...)}}
                    end
                    nothing
                    end)
@@ -180,16 +181,16 @@ macro traitimpl(tr)
 end
 
 # Defining a function dispatching on the trait (or not)
-# @traitfn f{X,Y;  Tr1{X,Y}}(x::X,y::Y) = ...
-# @traitfn f{X,Y; !Tr1{X,Y}}(x::X,y::Y) = ... # which is just sugar for:
-# @traitfn f{X,Y; Not{Tr1{X,Y}}}(x::X,y::Y) = ...
+# @traitfn f(x::X,y::Y) where {X,Y;  Tr1{X,Y}} = ...
+# @traitfn f(x::X,y::Y) where {X,Y; !Tr1{X,Y}} = ... # which is just sugar for:
+# @traitfn f(x::X,y::Y) where {X,Y; Not{Tr1{X,Y}}} = ...
 
 dispatch_cache = Dict()  # to ensure that the trait-dispatch function is defined only once per pair
 let
     global traitfn
-    function traitfn(tfn, cur_module)
+    function traitfn(tfn, macro_module)
         # Need
-        # f{X,Y}(x::X,Y::Y) = f(trait(Tr1{X,Y}), x, y)
+        # f(x::X,Y::Y) where {X,Y} = f(trait(Tr1{X,Y}), x, y)
         # f(::False, x, y)= ...
         if tfn.head==:macrocall
             hasmac = true
@@ -211,34 +212,61 @@ let
         # trait: expression of the trait
         # trait0: expression of the trait without any gensym'ed symbols
         #
+        # oldfn_syntax: set to true if the old parametric syntax is used
+        #
         # (The variables without gensym'ed symbols are mostly used for the key of the dispatch cache)
 
         fhead = tfn.args[1]
         fbody = tfn.args[2]
 
-        fname, paras, args0, kwargs = @match fhead begin
-            f_{paras__}(args0__;kwargs__) => (f,paras,args0,kwargs)
-            f_(args0__; kwargs__)           => (f,[],args0,kwargs)
-            f_{paras__}(args0__) => (f,paras,args0,[])
-            f_(args0__)           => (f,[],args0,[])
+        # TODO 1.0: remove
+        out = @match fhead begin
+            f_{paras__}(args0__;kwargs__)       => (f,paras,args0,kwargs,true)
+            f_(args0__; kwargs__)               => (f,[],args0,kwargs,false)
+            f_{paras__}(args0__)                => (f,paras,args0,[],true)
+            f_(args0__)                         => (f,[],args0,[],false)
+            f_(args0__; kwargs__) where paras__ => (f,paras,args0,kwargs,false)
+            f_(args0__) where paras__           => (f,paras,args0,[],false)
         end
+        if out==nothing
+            error("Could not parse function-head: $fhead. Note that several `where` are not supported.")
+        end
+        fname, paras, args0, kwargs, oldfn_syntax = out
         haskwargs = length(kwargs)>0
-        if length(paras)>0 && isa(paras[1],Expr) && paras[1].head==:parameters
-            # this is a Traits.jl style function
-            trait = paras[1].args[1]
+        # extract parameters and traits from paras and/or args0
+
+        if length(paras)==0
+            maybe_traitor = true
+        else
+            if paras[1] isa Expr && paras[1].head==:parameters
+                maybe_traitor = false
+                length(paras)<2 && error("Cannot parse function parameters: $para")
+                typs = paras[2:end]
+                trait = paras[1].args[1]
+            elseif paras[1] isa Expr && paras[1].head==:bracescat
+                maybe_traitor = false
+                length(paras)!=1 && error("Cannot parse function parameters: $para")
+                typs = paras[1].args[1:1]
+                trait = paras[1].args[2]
+            else
+                maybe_traitor = true
+                # the processing happens below
+            end
+        end
+        if !maybe_traitor
             trait0 = trait # without gensym'ed types, here identical
-            typs = paras[2:end]
             typs0 = typs # without gensym'ed types, here identical
             args1 = insertdummy(args0)
-        else
-            # This is a Traitor.jl style function.  Change it into a Traits.jl function.
+        else # This is a Traitor.jl style function (or invalid).
+            # Change paras & args0 into a Traits.jl function.
             # Find the traitor:
             typs0 = deepcopy(paras) # without gensym'ed types
             typs = paras
             out = nothing
             i = 0 # index of function argument with Traitor trait
             vararg = false
-            for (i,a) in enumerate(args0)
+            for outer i in eachindex(args0)
+                a = args0[i]
                 vararg = a.head==:...
                 if vararg
                     a = a.args[1]
@@ -290,34 +318,64 @@ let
         else
            pushloc = poploc = nothing
         end
-        # create the function containing the logic
+        # create the function containing the logic.  Do it separately if old-school parametric functions
+        # (TODO: delete the oldfn_syntax branches in Julia 1.0 (or 0.7 already?))
         retsym = gensym()
         if hasmac
-            fn = :(@dummy $fname{$(typs...)}($val, $(strip_kw(args1)...); $(kwargs...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
+            fn = if oldfn_syntax
+                :(@dummy $fname{$(typs...)}($val, $(strip_kw(args1)...); $(kwargs...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
+            else
+                :(@dummy $fname($val, $(strip_kw(args1)...); $(kwargs...)) where {$(typs...)} = ($pushloc; $retsym = $fbody; $poploc; $retsym))
+            end
             fn.args[1] = mac # replace @dummy
         else
-            fn = :($fname{$(typs...)}($val, $(strip_kw(args1)...); $(kwargs...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
+            fn = if oldfn_syntax
+                :($fname{$(typs...)}($val, $(strip_kw(args1)...); $(kwargs...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
+            else
+                :($fname($val, $(strip_kw(args1)...); $(kwargs...)) where {$(typs...)} = ($pushloc; $retsym = $fbody; $poploc; $retsym))
+            end
         end
         # Create the trait dispatch function
         ex = fn
-        key = (cur_module, fname, typs0, strip_kw(args0), trait0_opposite)
+        key = (macro_module, fname, typs0, strip_kw(args0), trait0_opposite)
         if !(key ∈ keys(dispatch_cache)) # define trait dispatch function
             if !haskwargs
-                ex = quote
-                    $fname{$(typs...)}($(args1...)) = (Base.@_inline_meta(); $fname($curmod.trait($trait),
-                                                                                    $(strip_tpara(strip_kw(args1))...)
-                                                                                    )
-                                                       )
-                    $ex
+                ex = if oldfn_syntax
+                    quote
+                        $fname{$(typs...)}($(args1...)) = (Base.@_inline_meta(); $fname($curmod.trait($trait),
+                                                                                        $(strip_tpara(strip_kw(args1))...)
+                                                                                        )
+                                                           )
+                        $ex
+                    end
+                else
+                    quote
+                        $fname($(args1...)) where {$(typs...)} = (Base.@_inline_meta(); $fname($curmod.trait($trait),
+                                                                                               $(strip_tpara(strip_kw(args1))...)
+                                                                                               )
+                                                                  )
+                        $ex
+                    end
                 end
             else
-                ex = quote
-                    $fname{$(typs...)}($(args1...);kwargs...) = (Base.@_inline_meta(); $fname($curmod.trait($trait),
-                                                                                              $(strip_tpara(strip_kw(args1))...);
-                                                                                              kwargs...
-                                                                                              )
-                                                                 )
-                    $ex
+                ex = if oldfn_syntax
+                    quote
+                        $fname{$(typs...)}($(args1...);kwargs...) = (Base.@_inline_meta(); $fname($curmod.trait($trait),
+                                                                                                  $(strip_tpara(strip_kw(args1))...);
+                                                                                                  kwargs...
+                                                                                                  )
+                                                                     )
+                        $ex
+                    end
+                else
+                    quote
+                        $fname($(args1...);kwargs...) where {$(typs...)} = (Base.@_inline_meta(); $fname($curmod.trait($trait),
+                                                                                                         $(strip_tpara(strip_kw(args1))...);
+                                                                                                         kwargs...
+                                                                                                         )
+                                                                            )
+                        $ex
+                    end
                 end
             end
             dispatch_cache[key] = (haskwargs, args0)
@@ -344,21 +402,17 @@ end
 Defines a function dispatching on a trait. Examples:
 
 ```julia
-@traitfn f{X;  Tr1{X}}(x::X,y) = ...
-@traitfn f{X; !Tr1{X}}(x::X,y) = ...
+@traitfn f(x::X,y) where {X;  Tr1{X}} = ...
+@traitfn f(x::X,y) where {X; !Tr1{X}} = ...
 
-@traitfn f{X,Y;  Tr2{X,Y}}(x::X,y::Y) = ...
-@traitfn f{X,Y; !Tr2{X,Y}}(x::X,y::Y) = ...
+@traitfn f(x::X,y::Y) where {X,Y;  Tr2{X,Y}} = ...
+@traitfn f(x::X,y::Y) where {X,Y; !Tr2{X,Y}} = ...
 ```
 
-Note that the second example is just syntax sugar for `@traitfn f{X,Y; Not{Tr1{X,Y}}}(x::X,y::Y) = ...`.
+Note that the second example is just syntax sugar for `@traitfn f(x::X,y::Y) where {X,Y; Not{Tr1{X,Y}}} = ...`.
 """
 macro traitfn(tfn)
-    @static if isdefined(Base, Symbol("@__MODULE__"))
-        esc(traitfn(tfn, __module__))
-    else
-        esc(traitfn(tfn, current_module()))
-    end
+    esc(traitfn(tfn, __module__))
 end
 
 ######
@@ -503,7 +557,7 @@ end
 "Returns number of llvm-IR lines for a call of function `fn` with argument types `args`"
 function llvm_lines(fn, args)
     io = IOBuffer()
-    Base.code_llvm(io, fn, args)
+    InteractiveUtils.code_llvm(io, fn, args)
     #Base.code_native(io, fn, args)
     count(c->c=='\n', String(take!(copy(io))))
 end

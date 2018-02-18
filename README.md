@@ -4,8 +4,8 @@
 [![Build Status](https://ci.appveyor.com/api/projects/status/github/mauro3/SimpleTraits.jl?branch=master&svg=true)](https://ci.appveyor.com/project/mauro3/simpletraits-jl/branch/master)
 [NEWS](NEWS.md)
 
-[![SimpleTraits](http://pkg.julialang.org/badges/SimpleTraits_0.5.svg)](http://pkg.julialang.org/?pkg=SimpleTraits)
 [![SimpleTraits](http://pkg.julialang.org/badges/SimpleTraits_0.6.svg)](http://pkg.julialang.org/?pkg=SimpleTraits)
+[![SimpleTraits](http://pkg.julialang.org/badges/SimpleTraits_0.7.svg)](http://pkg.julialang.org/detail/SimpleTraits)
 
 This package provides a macro-based implementation of traits, using
 [Tim Holy's trait trick](https://github.com/JuliaLang/julia/issues/2345#issuecomment-54537633).
@@ -78,15 +78,15 @@ Notes:
 
 It can be checked whether a type belongs to a trait with `istrait`:
 ```julia
-using Base.Test
+using Test
 @test istrait(IsNice{Int})
 @test !istrait(BelongTogether{Int,Int}) # only BelongTogether{Int,String} was added above
 ```
 
 Functions which dispatch on traits are constructed like:
 ```julia
-@traitfn f{X; IsNice{X}}(x::X) = "Very nice!"
-@traitfn f{X; !IsNice{X}}(x::X) = "Not so nice!"
+@traitfn f(x::X) where {X; IsNice{X}} = "Very nice!"
+@traitfn f(x::X) where {X; !IsNice{X}} = "Not so nice!"
 ```
 This means that a type `X` which is part of the trait `IsNice` will
 dispatch to the method returning `"Very nice!"`, otherwise to the one
@@ -101,11 +101,11 @@ function.  Thus there is no extra mental gymnastics required for a
 
 Similarly for `BelongTogether` which has two parameters:
 ```julia
-@traitfn f{X,Y; BelongTogether{X,Y}}(x::X,y::Y) = "$x and $y forever!"
+@traitfn f(x::X,y::Y) where {X,Y; BelongTogether{X,Y}} = "$x and $y forever!"
 @test f(5, "b")=="5 and b forever!"
 @test_throws MethodError f(5, 5)
 
-@traitfn f{X,Y; !BelongTogether{X,Y}}(x::X,y::Y) = "$x and $y cannot stand each other!"
+@traitfn f(x::X,y::Y) where {X,Y; !BelongTogether{X,Y}} = "$x and $y cannot stand each other!"
 @test f(5, 5)=="5 and 5 cannot stand each other!"
 ```
 
@@ -172,8 +172,8 @@ Example:
 @traitdef Tr{X}
 
 fn(x::Integer) = 1 # a normal method
-@traitfn fn{X<:AbstractFloat;  Tr{X}}(x::X) = 2
-@traitfn fn{X<:AbstractFloat; !Tr{X}}(x::X) = 3
+@traitfn fn(x::X) where {X<:AbstractFloat;  Tr{X}} = 2
+@traitfn fn(x::X) where {X<:AbstractFloat; !Tr{X}} = 3
 
 @traitimpl Tr{Float32}
 @traitimpl Tr{Int} # this does not impact dispatch of `fn`
@@ -188,7 +188,7 @@ one trait.  Continuing above example, this *does not work* as one may
 expect:
 ```julia
 @traitdef Tr2{X}
-@traitfn fn{X<:AbstractFloat; Tr2{X}}(x::X) = 4
+@traitfn fn(x::X) where {X<:AbstractFloat; Tr2{X}} = 4
 
 @traitimpl Tr2{Float16}
 fn(Float16(5)) # -> 4; dispatch through traits
@@ -196,7 +196,7 @@ fn(Float32(5)) # -> MethodError; method defined in previous example
                #    was overwritten above
 ```
 This last definition of `fn` just overwrites the definition `@traitfn
-f{X; Tr{X}}(x::X) = 2` from above.
+f(x::X) where {X; Tr{X}} = 2` from above.
 
 If you need to dispatch on several traits in a single trait-method,
 then you're out of luck.  But please voice your grievance over in pull
@@ -327,7 +327,7 @@ Julia 0.5 one could use a generated function but not anymore in Julia 0.6.)
 
 Note also that trait functions can be generated functions:
 ```julia
-@traitfn @generated fg{X; IsNice{X}}(x::X) = (println(x); :x)
+@traitfn @generated fg(x::X) where {X; IsNice{X}} = (println(x); :x)
 ```
 
 # Innards
@@ -346,16 +346,16 @@ julia> macroexpand(:(@traitimpl Tr{Int}))
 SimpleTraits.trait{X1 <: Int}(::Type{Tr{X1}}) = Tr{X1}
 SimpleTraits.istrait{X1 <: Int}(::Type{Tr{X1}}) = true # for convenience, really
 
-julia> macroexpand(:(@traitfn g{X; Tr{X}}(x::X)= x+1))
+julia> macroexpand(:(@traitfn g(x::X) where {X; Tr{X}}= x+1))
 
-@inline g{X}(x::X) = g(trait(Tr{X}), x) # this is Tim's trick, using above grouping-function
-g{X}(::Type{Tr{X}},x::X) = x + 1 # this is the logic
+@inline g(x::X) where {X} = g(trait(Tr{X}), x) # this is Tim's trick, using above grouping-function
+g(::Type{Tr{X}},x::X) where {X} = x + 1 # this is the logic
 
-julia> macroexpand(:(@traitfn g{X; !Tr{X}}(x::X)= x+1000))
+julia> macroexpand(:(@traitfn g(x::X) where {X; !Tr{X}}= x+1000))
 
 # the trait dispatch helper function needn't be defined twice,
 # only the logic:
-g{X}(::Type{ Not{Tr{X}} }, x::X) = x + 1000
+g(::Type{ Not{Tr{X}} }, x::X) where {X} = x + 1000
 ```
 
 For a detailed explanation of how Tim's trick works, see
@@ -372,8 +372,8 @@ definitions.
 Example, dispatch on whether an argument is immutable or not:
 
 ```julia
-@traitfn f{X; IsImmutable{X}}(x::X) = X(x.fld+1) # make a new instance
-@traitfn f{X; !IsImmutable{X}}(x::X) = (x.fld += 1; x) # update in-place
+@traitfn f(x::X) where {X; IsImmutable{X}} = X(x.fld+1) # make a new instance
+@traitfn f(x::X) where {X; !IsImmutable{X}} = (x.fld += 1; x) # update in-place
 
 # use
 mutable struct A; fld end
