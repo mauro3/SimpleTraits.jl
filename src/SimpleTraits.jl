@@ -187,7 +187,7 @@ end
 dispatch_cache = Dict()  # to ensure that the trait-dispatch function is defined only once per pair
 let
     global traitfn
-    function traitfn(tfn)
+    function traitfn(tfn, cur_module)
         # Need
         # f{X,Y}(x::X,Y::Y) = f(trait(Tr1{X,Y}), x, y)
         # f(::False, x, y)= ...
@@ -300,7 +300,7 @@ let
         end
         # Create the trait dispatch function
         ex = fn
-        key = (@__MODULE__, fname, typs0, strip_kw(args0), trait0_opposite)
+        key = (cur_module, fname, typs0, strip_kw(args0), trait0_opposite)
         if !(key ∈ keys(dispatch_cache)) # define trait dispatch function
             if !haskwargs
                 ex = quote
@@ -354,7 +354,11 @@ Defines a function dispatching on a trait. Examples:
 Note that the second example is just syntax sugar for `@traitfn f{X,Y; Not{Tr1{X,Y}}}(x::X,y::Y) = ...`.
 """
 macro traitfn(tfn)
-    esc(traitfn(tfn))
+    @static if isdefined(Base, Symbol("@__MODULE__"))
+        esc(traitfn(tfn, __module__))
+    else
+        esc(traitfn(tfn, current_module()))
+    end
 end
 
 ######

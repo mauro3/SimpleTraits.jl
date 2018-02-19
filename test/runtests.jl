@@ -245,6 +245,17 @@ isarrow(X) = eltype(X)<:Integer ? true : false
 @test !istrait(TrArrow2{Vector{Int}})
 @test istrait(TrArrow2{Vector{Float64}})
 
+####
+# issue with key in dispatch_cache
+@traitfn f_dc(::::Tr1) = 1
+module Mod
+using SimpleTraits
+using Base.Test
+@traitdef Tr1{X}
+@traitimpl Tr1{Integer}
+@traitfn f_dc(::::Tr1) = 2
+@test f_dc(1) == 2
+end
 
 ######
 # Other tests
