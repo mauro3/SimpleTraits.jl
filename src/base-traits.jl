@@ -34,7 +34,7 @@ else
     export IsConcrete
     "Trait of all concrete types types"
     @traitdef IsConcrete{X}
-    @traitimpl IsConcrete{X} <- isconcrete(X)
+    @traitimpl IsConcrete{X} <- isconcretetype(X)
 
     Base.@deprecate_binding IsLeafType IsConcrete
 end
