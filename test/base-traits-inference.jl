@@ -14,7 +14,9 @@ basetrs = [VERSION<v"0.7-" ? :IsLeafType=>:Int : :IsConcrete=>:Int,
            :IsNothing=>:Int,
            :IsCallable=>:(typeof(sin)),
            :IsIterator=>:(Dict{Int,Int})]
-
-for (bt, tp) in basetrs
-    @test @eval @check_fast_traitdispatch $bt $tp true
+# Only execute if code-coverage is turned off
+if Base.JLOptions().code_coverage==0
+    for (bt, tp) in basetrs
+        @test @eval @check_fast_traitdispatch $bt $tp true
+    end
 end
