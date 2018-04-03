@@ -35,6 +35,13 @@ breakfast — your "win" should be greater ;-)
 
 # Manual
 
+**Note for Julia-0.6:**  Below examples for `@traitfn` (using `where`-function
+  syntax) only work on Julia-0.7, for Julia-0.6 this syntax cannot be
+  not supported.
+  For Julia-0.6, see the README of the
+  SimpleTraits version
+  [v0.6.0](https://github.com/mauro3/SimpleTraits.jl/tree/v0.6.0) instead.
+
 Traits are defined with `@traitdef`:
 ```julia
 using SimpleTraits
