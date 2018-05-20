@@ -195,8 +195,7 @@ let
         if tfn.head==:macrocall
             hasmac = true
             mac = tfn.args[1]
-            # https://github.com/JuliaLang/julia/pull/23885
-            tfn = VERSION<v"0.7-" ? tfn.args[2] : tfn.args[3]
+            tfn = tfn.args[3]
         else
             hasmac = false
         end
@@ -526,6 +525,9 @@ Example:
 NOTE: This only works when code-coverage is disabled!  Thus, do not
 use this macro in tests (or disable `coverage=true` in your
 `.travis.yml` script), or it will error.
+
+NOTE: This does not seem to work all the time.  At least in Julia 0.7 this test is
+negative for IsIndexLinear, however, it's fast.
 
 TODO: This is rather ugly.  Ideally this would be a function but I ran
 into problems, see source code.  Also the macro is ugly.  PRs welcome...

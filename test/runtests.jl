@@ -78,8 +78,7 @@ struct C9<:A9 end
 @test f(5,5, "a")==2
 # Note, two argument traits have no Traitor style syntax
 
-# This will overwrite the definition def1 above
-
+# This will overwrite the definition def1 above and generate a warning
 @traitfn f(x::X) where {X; !Tr2{X,X}} = 10
 @traitfn f(x::X) where {X; Tr2{X,X}} = 100
 @test f(5)==10
@@ -250,7 +249,8 @@ isarrow(X) = eltype(X)<:Integer ? true : false
 @traitfn f_dc(::::Tr1) = 1
 module Mod
 using SimpleTraits
-using Base.Test
+using Compat
+using Test
 @traitdef Tr1{X}
 @traitimpl Tr1{Integer}
 @traitfn f_dc(::::Tr1) = 2
@@ -270,5 +270,7 @@ include("backtraces.jl")
 # throws lots of deprecation warnings!
 # TODO remove with Julia 0.7
 module OldFnSyntax
+println("\n")
+println("The following warnings are ok as they test deprecated code:\n")
 include("runtests-oldfn-syntax.jl")
 end

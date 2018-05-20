@@ -13,7 +13,7 @@ function hasline(bt, n)
         lkup = StackTraces.lookup(b)
         if length(lkup) >= 2
             l1, l2 = lkup[1], lkup[2]
-            if (contains(string(l1.file), "backtraces.jl") &&
+            if (occursin("backtraces.jl", string(l1.file)) &&
                 l1.func == :foo &&
                 l1.line == n &&
                 contains(string(l2.file), "SimpleTraits.jl"))
@@ -24,13 +24,7 @@ function hasline(bt, n)
     false
 end
 
-if VERSION<v"0.7-"
-    @test hasline(foo(1), 6)
-    @test hasline(foo(1.0), 7)
-else
-    @test_broken hasline(foo(1), 6)
-    @test_broken hasline(foo(1.0), 7)
-end
-
+@test_broken hasline(foo(1), 6)
+@test_broken hasline(foo(1.0), 7)
 
 nothing

@@ -2,7 +2,7 @@ module BaseTraits
 using SimpleTraits
 
 
-export IsLeafType, IsBits, IsImmutable, IsContiguous, IsIndexLinear,
+export IsLeafType, IsConcrete, IsBits, IsImmutable, IsContiguous, IsIndexLinear,
        IsAnything, IsNothing, IsCallable, IsIterator
 
 "Trait which contains all types"
@@ -26,18 +26,11 @@ Base.@pure _isimmutable(X) = !X.mutable
 @traitdef IsCallable{X}
 @traitimpl IsCallable{X} <- (X->(X<:Function ||  length(methods(X))>0))(X)
 
-if VERSION<v"0.7-"
-    "Trait of all leaf types types"
-    @traitdef IsLeafType{X}
-    @traitimpl IsLeafType{X} <- isleaftype(X)
-else
-    export IsConcrete
-    "Trait of all concrete types types"
-    @traitdef IsConcrete{X}
-    @traitimpl IsConcrete{X} <- isconcretetype(X)
+"Trait of all concrete types types"
+@traitdef IsConcrete{X}
+@traitimpl IsConcrete{X} <- isconcretetype(X)
 
-    Base.@deprecate_binding IsLeafType IsConcrete
-end
+Base.@deprecate_binding IsLeafType IsConcrete
 
 "Types which have contiguous memory layout"
 @traitdef IsContiguous{X} # https://github.com/JuliaLang/julia/issues/10889
@@ -69,7 +62,8 @@ Base.@deprecate_binding IsFastLinearIndex IsIndexLinear
 "Trait of all iterator types"
 @traitdef IsIterator{X}
 @generated function SimpleTraits.trait(::Type{IsIterator{X}}) where {X}
-    hasmethod(start, Tuple{X}) ? :(IsIterator{X}) : :(Not{IsIterator{X}})
+    error("Not supported in Julia 0.7, due to fallbacks.  Should work again in 1.0")
+    # hasmethod(iterate, Tuple{X}) ? :(IsIterator{X}) : :(Not{IsIterator{X}})
 end
 
 end # module

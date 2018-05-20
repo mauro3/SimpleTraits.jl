@@ -28,7 +28,4 @@ c = view(a, 1:2:5)
 struct T9867 end
 @test istrait(IsCallable{T9867})
 
-@test istrait(IsIterator{Array})
-@test !istrait(IsIterator{Symbol})
-@test istrait(IsIterator{Base.UnitRange{Int}})
-@test istrait(IsIterator{Base.UnitRange})
+@test_throws ErrorException istrait(IsIterator{Base.UnitRange})
