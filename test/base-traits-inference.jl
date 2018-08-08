@@ -16,7 +16,6 @@ basetrs = [:IsConcrete=>:Int,
            :IsIterator=>:(Dict{Int,Int})]
 
 for (bt, tp) in basetrs
-    bt==:IsIterator && continue # errors currently
-    bt==:IsIndexLinear && continue # this is a false negative, not sure why
+    bt==:IsIterator && VERSION<v"1-" && continue # errors on 0.7 due to start/step/done
     @test @eval @check_fast_traitdispatch $bt $tp true
 end
