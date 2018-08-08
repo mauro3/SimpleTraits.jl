@@ -263,14 +263,3 @@ end
 include("base-traits.jl")
 include("base-traits-inference.jl")
 include("backtraces.jl")
-
-#####
-# Old function syntax
-####
-# throws lots of deprecation warnings!
-# TODO remove with Julia 0.7
-module OldFnSyntax
-println("\n")
-println("The following warnings are ok as they test deprecated code:\n")
-include("runtests-oldfn-syntax.jl")
-end

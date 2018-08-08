@@ -1,5 +1,3 @@
-__precompile__()
-
 module SimpleTraits
 using MacroTools
 const curmod = nameof(@__MODULE__)
@@ -474,10 +472,8 @@ end
 
 # generates: X1, X2,... or x1, x2.... (just symbols not actual TypeVar)
 struct GenerateTypeVars{CASE} end
-Base.start(::GenerateTypeVars) = 1
-Base.next(::GenerateTypeVars{:upcase}, state) = (Symbol("X$state"), state+1) # X1,..
-Base.next(::GenerateTypeVars{:lcase}, state) = (Symbol("x$state"), state+1)  # x1,...
-Base.done(::GenerateTypeVars, state) = false
+Base.iterate(::GenerateTypeVars{:upcase}, state=1) = (Symbol("X$state"), state+1) # X1,..
+Base.iterate(::GenerateTypeVars{:lcase}, state=1) = (Symbol("x$state"), state+1)  # x1,...
 
 ####
 # Annotating the source location

@@ -15,7 +15,8 @@ export IsLeafType, IsConcrete, IsBits, IsImmutable, IsContiguous, IsIndexLinear,
 
 "Trait of all isbits-types"
 @traitdef IsBits{X}
-@traitimpl IsBits{X} <- isbits(X)
+Base.@pure _isbits(X) = X.isbitstype
+@traitimpl IsBits{X} <- _isbits(X)
 
 "Trait of all immutable types"
 @traitdef IsImmutable{X}
@@ -62,8 +63,11 @@ Base.@deprecate_binding IsFastLinearIndex IsIndexLinear
 "Trait of all iterator types"
 @traitdef IsIterator{X}
 @generated function SimpleTraits.trait(::Type{IsIterator{X}}) where {X}
-    error("Not supported in Julia 0.7, due to fallbacks.  Should work again in 1.0")
-    # hasmethod(iterate, Tuple{X}) ? :(IsIterator{X}) : :(Not{IsIterator{X}})
+    if VERSION<v"1-"
+        error("Not supported in Julia 0.7, due to fallbacks.  Should work again in 1.0")
+    else
+        hasmethod(iterate, Tuple{X}) ? :(IsIterator{X}) : :(Not{IsIterator{X}})
+    end
 end
 
 end # module
