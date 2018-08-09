@@ -271,7 +271,7 @@ minor version changes).
 Instead of using `@traitimpl` to add types to traits, it can be
 programmed.  Running `@traitimpl IsNice{Int}` essentially expands to
 ```julia
-SimpleTraits.trait{X1 <: Int}(::Type{IsNice{X1}}) = IsNice{X1}
+SimpleTraits.trait(::Type{IsNice{X1}}) where {X1 <: Int} = IsNice{X1}
 ```
 I.e. `trait` is the identity function for a fulfilled trait and
 returns `Not{TraitInQuestion{...}}` otherwise (this is the fall-back
@@ -283,7 +283,7 @@ dispatch (see `@check_fast_traitdispatch` for a helper to check).
 Example leading to static dispatch (since Julia 0.6):
 ```julia
 @traitdef IsBits{X}
-SimpleTraits.trait{X1}(::Type{IsBits{X1}}) = isbits(X1) ? IsBits{X1} : Not{IsBits{X1}}
+SimpleTraits.trait(::Type{IsBits{X1}}) where {X1} = isbits(X1) ? IsBits{X1} : Not{IsBits{X1}}
 istrait(IsBits{Int}) # true
 istrait(IsBits{Array{Int,1}}) # false
 struct A
@@ -297,7 +297,7 @@ function or *pure* functions (sometimes they need to be
 annotated with `Base.@pure`):
 ```julia
 @traitdef IsBits{X}
-@generated function SimpleTraits.trait{X1}(::Type{IsBits{X1}})
+@generated function SimpleTraits.trait(::Type{IsBits{X1}}) where X1
     isbits(X1) ? :(IsBits{X1}) : :(Not{IsBits{X1}})
 end
 ```
@@ -318,7 +318,7 @@ instance, the trait given by (in pseudo syntax) `BeautyAndBeast{X,Y} <: IsNice{X
 !IsNice{Y}, BelongTogether{X,Y}`:
 ```julia
 @traitdef BeautyAndBeast{X,Y}
-function SimpleTraits.trait{X,Y}(::Type{BeautyAndBeast{X,Y}})
+function SimpleTraits.trait(::Type{BeautyAndBeast{X,Y}}) where {X,Y}
     if istrait(IsNice{X}) && !istrait(IsNice{Y}) && BelongTogether{X,Y}
         BeautyAndBeast{X,Y}
     else
