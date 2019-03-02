@@ -19,7 +19,7 @@ background and a quick introduction to traits watch my 10min
 [JuliaCon 2015](https://youtu.be/j9w8oHfG1Ic) talk.
 
 One good example of the use of traits is the
-[abstract array interface](https://docs.julialang.org/en/stable/manual/interfaces/#man-interface-array-1)
+[abstract array interface](https://docs.julialang.org/en/v1/manual/interfaces/#man-interface-array-1)
 in Julia-Base.  An abstract array either belongs to the
 `Base.IndexLinear` or `Base.IndexCartesian` trait, depending on how its
 internal indexing works.  The advantage to use a trait there is that
@@ -36,7 +36,7 @@ breakfast — your "win" should be greater ;-)
 # Manual
 
 **Note for Julia-0.6:**  Below examples for `@traitfn` (using `where`-function
-  syntax) only work on Julia-0.7, for Julia-0.6 this syntax cannot be
+  syntax) only work on Julia-0.7 or higher, for Julia-0.6 this syntax cannot be
   not supported.
   For Julia-0.6, see the README of the
   SimpleTraits version
