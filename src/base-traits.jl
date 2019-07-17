@@ -60,7 +60,13 @@ Base.@deprecate_binding IsFastLinearIndex IsIndexLinear
 ##                    # types<:AbstractArray are automatically part
 
 
-"Trait of all iterator types"
+"""
+Trait of all iterator types
+
+Note that this uses a generated function which queries `hasmethod`.  This is
+ill-defined behavior!  Although you might get away with it, see
+https://github.com/mauro3/SimpleTraits.jl/issues/40.
+"""
 @traitdef IsIterator{X}
 @generated function SimpleTraits.trait(::Type{IsIterator{X}}) where {X}
     if VERSION<v"1-"

@@ -350,8 +350,8 @@ end
 julia> macroexpand(:(@traitimpl Tr{Int}))
 
 # this function does the grouping of types into traits:
-SimpleTraits.trait{X1 <: Int}(::Type{Tr{X1}}) = Tr{X1}
-SimpleTraits.istrait{X1 <: Int}(::Type{Tr{X1}}) = true # for convenience, really
+SimpleTraits.trait(::Type{Tr{X1}}) where X1 <: Int = Tr{X1}
+SimpleTraits.istrait(::Type{Tr{X1}}) where X1 <: Int = true # for convenience, really
 
 julia> macroexpand(:(@traitfn g(x::X) where {X; Tr{X}}= x+1))
 
