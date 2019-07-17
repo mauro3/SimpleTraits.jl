@@ -249,7 +249,6 @@ isarrow(X) = eltype(X)<:Integer ? true : false
 @traitfn f_dc(::::Tr1) = 1
 module Mod
 using SimpleTraits
-using Compat
 using Test
 @traitdef Tr1{X}
 @traitimpl Tr1{Integer}
