@@ -530,7 +530,7 @@ into problems, see source code.  Also the macro is ugly.  PRs welcome...
 """
 macro check_fast_traitdispatch(Tr, Arg=:Int, verbose=false)
     if Base.JLOptions().code_coverage==1
-        warn("The SimpleTraits.@check_fast_traitdispatch macro only works when running Julia without --code-coverage")
+        @warn "The SimpleTraits.@check_fast_traitdispatch macro only works when running Julia without --code-coverage"
         return nothing
     end
     test_fn = gensym()

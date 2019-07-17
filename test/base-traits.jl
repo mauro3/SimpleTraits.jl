@@ -28,8 +28,4 @@ c = view(a, 1:2:5)
 struct T9867 end
 @test istrait(IsCallable{T9867})
 
-if VERSION<v"1-"
-    @test_throws ErrorException istrait(IsIterator{Base.UnitRange})
-else
-    @test istrait(IsIterator{Base.UnitRange})
-end
+@test istrait(IsIterator{Base.UnitRange})

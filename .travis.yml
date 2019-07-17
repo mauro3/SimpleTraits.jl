@@ -10,3 +10,5 @@ matrix:
     - julia: nightly
 notifications:
   email: false
+script:
+  - julia -e 'using Pkg; Pkg.build(); Pkg.test(; coverage=false);'

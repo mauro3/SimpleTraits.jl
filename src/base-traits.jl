@@ -69,11 +69,7 @@ https://github.com/mauro3/SimpleTraits.jl/issues/40.
 """
 @traitdef IsIterator{X}
 @generated function SimpleTraits.trait(::Type{IsIterator{X}}) where {X}
-    if VERSION<v"1-"
-        error("Not supported in Julia 0.7, due to fallbacks.  Should work again in 1.0")
-    else
-        hasmethod(iterate, Tuple{X}) ? :(IsIterator{X}) : :(Not{IsIterator{X}})
-    end
+    hasmethod(iterate, Tuple{X}) ? :(IsIterator{X}) : :(Not{IsIterator{X}})
 end
 
 end # module
