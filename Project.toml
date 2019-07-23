@@ -1,7 +1,7 @@
 name = "SimpleTraits"
 uuid = "699a6c99-e7fa-54fc-8d76-47d257e15c1d"
-version = "0.9.0"
 author = ["Mauro Werder <mauro3@runbox.com>"]
+version = "0.9.0"
 
 [deps]
 InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
@@ -13,6 +13,7 @@ julia = "≥ 1.0"
 
 [extras]
 Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+Markdown = "d6f4376e-aef5-505a-96c1-9c027394607a"
 
 [targets]
-test = ["Test"]
+test = ["Test", "Markdown"]

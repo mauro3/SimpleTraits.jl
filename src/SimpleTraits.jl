@@ -320,16 +320,16 @@ let
         retsym = gensym()
         if hasmac
             fn = if oldfn_syntax
-                :(@dummy $fname{$(typs...)}($val, $(strip_kw(args1)...); $(kwargs...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
+                :(Base.@__doc__ @dummy $fname{$(typs...)}($val, $(strip_kw(args1)...); $(kwargs...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
             else
-                :(@dummy $fname($val, $(strip_kw(args1)...); $(kwargs...)) where {$(typs...)} = ($pushloc; $retsym = $fbody; $poploc; $retsym))
+                :(Base.@__doc__ @dummy $fname($val, $(strip_kw(args1)...); $(kwargs...)) where {$(typs...)} = ($pushloc; $retsym = $fbody; $poploc; $retsym))
             end
-            fn.args[1] = mac # replace @dummy
+            fn.args[findfirst(ex->isexpr(ex) && ex.head==:macrocall, fn.args)].args[1] = mac # replace @dummy
         else
             fn = if oldfn_syntax
-                :($fname{$(typs...)}($val, $(strip_kw(args1)...); $(kwargs...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
+                :(Base.@__doc__ $fname{$(typs...)}($val, $(strip_kw(args1)...); $(kwargs...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
             else
-                :($fname($val, $(strip_kw(args1)...); $(kwargs...)) where {$(typs...)} = ($pushloc; $retsym = $fbody; $poploc; $retsym))
+                :(Base.@__doc__ $fname($val, $(strip_kw(args1)...); $(kwargs...)) where {$(typs...)} = ($pushloc; $retsym = $fbody; $poploc; $retsym))
             end
         end
         # Create the trait dispatch function
