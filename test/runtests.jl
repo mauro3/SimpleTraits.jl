@@ -1,5 +1,6 @@
 using SimpleTraits
 using Test
+using Markdown
 
 const trait = SimpleTraits.trait
 
@@ -184,7 +185,6 @@ struct C9<:A9 end
 # above does not work with Traitor syntax
 @test_broken SimpleTraits.traitfn(:(defargs6a(x::::Tr1=1, y=2) = x+y))
 
-
 # traitfn with macro
 @traitfn @inbounds gg(x::X) where {X; Tr1{X}} = x
 @test gg(5)==5
@@ -230,6 +230,14 @@ struct C9<:A9 end
 @test f12t(1)==1
 @test f12t(5.5)==2
 
+# traitfn with docstring
+"Test documentation 1"
+@traitfn f13(x::X) where {X; Tr1{X}} = 1
+@test "Test documentation 1\n" == Markdown.plain(@doc f13)
+
+"Test documentation 2"
+@traitfn @generated f14(x::X) where {X; Tr1{X}} = 1
+@test "Test documentation 2\n" == Markdown.plain(@doc f14)
 
 ###
 # @traitimpl Tr{X} <- istr(X)
