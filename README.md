@@ -1,8 +1,9 @@
 # SimpleTraits
 
-[![Build Status](https://travis-ci.org/mauro3/SimpleTraits.jl.svg?branch=master)](https://travis-ci.org/mauro3/SimpleTraits.jl)
+[![Build Status](https://travis-ci.com/mauro3/SimpleTraits.jl.svg?branch=master)](https://travis-ci.com/mauro3/SimpleTraits.jl)
 [![Build Status](https://ci.appveyor.com/api/projects/status/github/mauro3/SimpleTraits.jl?branch=master&svg=true)](https://ci.appveyor.com/project/mauro3/simpletraits-jl/branch/master)
 [NEWS](NEWS.md)
+<!-- Code coverage not possible due to testing -->
 
 [![SimpleTraits](http://pkg.julialang.org/badges/SimpleTraits_0.6.svg)](http://pkg.julialang.org/?pkg=SimpleTraits)
 [![SimpleTraits](http://pkg.julialang.org/badges/SimpleTraits_0.7.svg)](http://pkg.julialang.org/detail/SimpleTraits)
