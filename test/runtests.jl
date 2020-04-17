@@ -270,3 +270,12 @@ end
 include("base-traits.jl")
 include("base-traits-inference.jl")
 include("backtraces.jl")
+
+####
+# issue 18
+@testset "Issue 18" begin
+    @traitdef T18{X}
+    @traitimpl T18{Int}
+    @traitfn f(x::Integer::T18) = 1
+    @test f(5)==1
+end
