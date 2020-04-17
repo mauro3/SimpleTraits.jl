@@ -209,8 +209,6 @@ let
         # trait: expression of the trait
         # trait0: expression of the trait without any gensym'ed symbols
         #
-        # oldfn_syntax: set to true if the old parametric syntax is used
-        #
         # (The variables without gensym'ed symbols are mostly used for the key of the dispatch cache)
 
         fhead = tfn.args[1]
@@ -218,17 +216,15 @@ let
 
         # TODO 1.0: remove
         out = @match fhead begin
-            f_{paras__}(args0__;kwargs__)       => (f,paras,args0,kwargs,true)
-            f_(args0__; kwargs__)               => (f,[],args0,kwargs,false)
-            f_{paras__}(args0__)                => (f,paras,args0,[],true)
-            f_(args0__)                         => (f,[],args0,[],false)
-            f_(args0__; kwargs__) where paras__ => (f,paras,args0,kwargs,false)
-            f_(args0__) where paras__           => (f,paras,args0,[],false)
+            f_(args0__; kwargs__)               => (f,[],args0,kwargs)
+            f_(args0__)                         => (f,[],args0,[])
+            f_(args0__; kwargs__) where paras__ => (f,paras,args0,kwargs)
+            f_(args0__) where paras__           => (f,paras,args0,[])
         end
         if out==nothing
             error("Could not parse function-head: $fhead. Note that several `where` are not supported.")
         end
-        fname, paras, args0, kwargs, oldfn_syntax = out
+        fname, paras, args0, kwargs = out
         haskwargs = length(kwargs)>0
         # extract parameters and traits from paras and/or args0
 
@@ -315,64 +311,33 @@ let
         else
            pushloc = poploc = nothing
         end
-        # create the function containing the logic.  Do it separately if old-school parametric functions
-        # (TODO: delete the oldfn_syntax branches in Julia 1.0 (or 0.7 already?))
+        # create the function containing the logic.
         retsym = gensym()
         if hasmac
-            fn = if oldfn_syntax
-                :(Base.@__doc__ @dummy $fname{$(typs...)}($val, $(strip_kw(args1)...); $(kwargs...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
-            else
-                :(Base.@__doc__ @dummy $fname($val, $(strip_kw(args1)...); $(kwargs...)) where {$(typs...)} = ($pushloc; $retsym = $fbody; $poploc; $retsym))
-            end
-            fn.args[findfirst(ex->isexpr(ex) && ex.head==:macrocall, fn.args)].args[1] = mac # replace @dummy
+            ex = :(Base.@__doc__ @dummy $fname($val, $(strip_kw(args1)...); $(kwargs...)) where {$(typs...)} = ($pushloc; $retsym = $fbody; $poploc; $retsym))
+            ex.args[findfirst(e->isexpr(e) && e.head==:macrocall, ex.args)].args[1] = mac # replace @dummy
         else
-            fn = if oldfn_syntax
-                :(Base.@__doc__ $fname{$(typs...)}($val, $(strip_kw(args1)...); $(kwargs...)) = ($pushloc; $retsym = $fbody; $poploc; $retsym))
-            else
-                :(Base.@__doc__ $fname($val, $(strip_kw(args1)...); $(kwargs...)) where {$(typs...)} = ($pushloc; $retsym = $fbody; $poploc; $retsym))
-            end
+            ex = :(Base.@__doc__ $fname($val, $(strip_kw(args1)...); $(kwargs...)) where {$(typs...)} = ($pushloc; $retsym = $fbody; $poploc; $retsym))
         end
         # Create the trait dispatch function
-        ex = fn
         key = (macro_module, fname, typs0, strip_kw(args0), trait0_opposite)
         if !(key ∈ keys(dispatch_cache)) # define trait dispatch function
-            if !haskwargs
-                ex = if oldfn_syntax
-                    quote
-                        $fname{$(typs...)}($(args1...)) = (Base.@_inline_meta(); $fname($curmod.trait($trait),
-                                                                                        $(strip_tpara(strip_kw(args1))...)
-                                                                                        )
-                                                           )
-                        $ex
-                    end
-                else
-                    quote
-                        $fname($(args1...)) where {$(typs...)} = (Base.@_inline_meta(); $fname($curmod.trait($trait),
-                                                                                               $(strip_tpara(strip_kw(args1))...)
-                                                                                               )
-                                                                  )
-                        $ex
-                    end
+            ex = if !haskwargs
+                quote
+                    $fname($(args1...)) where {$(typs...)} = (Base.@_inline_meta(); $fname($curmod.trait($trait),
+                                                                                           $(strip_tpara(strip_kw(args1))...)
+                                                                                           )
+                                                              )
+                    $ex
                 end
             else
-                ex = if oldfn_syntax
-                    quote
-                        $fname{$(typs...)}($(args1...);kwargs...) = (Base.@_inline_meta(); $fname($curmod.trait($trait),
-                                                                                                  $(strip_tpara(strip_kw(args1))...);
-                                                                                                  kwargs...
-                                                                                                  )
-                                                                     )
-                        $ex
-                    end
-                else
-                    quote
-                        $fname($(args1...);kwargs...) where {$(typs...)} = (Base.@_inline_meta(); $fname($curmod.trait($trait),
-                                                                                                         $(strip_tpara(strip_kw(args1))...);
-                                                                                                         kwargs...
-                                                                                                         )
-                                                                            )
-                        $ex
-                    end
+                quote
+                    $fname($(args1...);kwargs...) where {$(typs...)} = (Base.@_inline_meta(); $fname($curmod.trait($trait),
+                                                                                                     $(strip_tpara(strip_kw(args1))...);
+                                                                                                     kwargs...
+                                                                                                     )
+                                                                        )
+                    $ex
                 end
             end
             dispatch_cache[key] = (haskwargs, args0)
