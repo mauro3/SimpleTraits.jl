@@ -1,7 +1,6 @@
 module SimpleTraits
 using MacroTools
 const curmod = nameof(@__MODULE__)
-
 import InteractiveUtils
 
 # This is basically just adding a few convenience functions & macros
@@ -204,6 +203,7 @@ let
         # args0: vector of all arguments except wags (without any gensym'ed symbols but stripped of Traitor-traits)
         # args1: like args0 but with gensym'ed symbols where necessary
         # kwargs: all kwargs
+        # paras: where-clause parameters
         # typs0: vector of all function parameters (without the trait-ones, no gensym'ed)
         # typs: vector of all function parameters (without the trait-ones, with gensym'ed for Traitor)
         # trait: expression of the trait
@@ -250,10 +250,10 @@ let
             trait0 = trait # without gensym'ed types, here identical
             typs0 = typs # without gensym'ed types, here identical
             args1 = insertdummy(args0)
-        else # This is a Traitor.jl style function (or invalid).
-            # Change paras & args0 into a Traits.jl function.
+        else # This is a Traitor.jl-style function (or invalid).
+            # Change typs, trait & args0 into a Traits.jl function.
             # Find the traitor:
-            typs0 = deepcopy(paras) # without gensym'ed types
+            typs0 = deepcopy(paras) # where-clause without gensym'ed types
             typs = paras
             out = nothing
             i = 0 # index of function argument with Traitor trait
@@ -274,10 +274,21 @@ let
             end
             out==nothing && error("No trait found in function signature")
             arg,typ,trait0 = out
-            if typ==nothing
+            if typ===nothing # case `f(x::::Tr)`
                 typ = gensym()
                 push!(typs, typ)
+            elseif length(typs)==0 # case `f(x::Integer::Tr)`
+                    # needs to be put into `f(x::I::Tr) where I<:Integer`
+                    typ_ = typ
+                    typ = gensym()
+                    push!(typs, :($typ<:$typ_))
             end
+            # Note other cases, e.g.
+            # f(x::T::Tr) where T
+            # or
+            # f(x::Array{T,1}::Tr) where T
+            #
+            # are handled without doing anything
             if isnegated(trait0)
                 trait = :(!($(trait0.args[2]){$typ}))
             else
@@ -292,7 +303,7 @@ let
                 args1[i] = arg==nothing ? :(::$typ) : :($arg::$typ)
             end
             args1 = insertdummy(args1)
-        end
+        end # Traitor.jl-style function
 
         # Process dissected AST
         if isnegated(trait)
