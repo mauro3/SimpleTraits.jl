@@ -5,9 +5,6 @@
 [NEWS](NEWS.md)
 <!-- Code coverage not possible due to testing -->
 
-[![SimpleTraits](http://pkg.julialang.org/badges/SimpleTraits_0.6.svg)](http://pkg.julialang.org/?pkg=SimpleTraits)
-[![SimpleTraits](http://pkg.julialang.org/badges/SimpleTraits_0.7.svg)](http://pkg.julialang.org/detail/SimpleTraits)
-
 This package provides a macro-based implementation of traits, using
 [Tim Holy's trait trick](https://github.com/JuliaLang/julia/issues/2345#issuecomment-54537633).
 The main idea behind traits is to group types outside the
@@ -36,12 +33,6 @@ breakfast — your "win" should be greater ;-)
 
 # Manual
 
-**Note for Julia-0.6:**  Below examples for `@traitfn` (using `where`-function
-  syntax) only work on Julia-0.7 or higher, for Julia-0.6 this syntax cannot be
-  not supported.
-  For Julia-0.6, see the README of the
-  SimpleTraits version
-  [v0.6.0](https://github.com/mauro3/SimpleTraits.jl/tree/v0.6.0) instead.
 
 Traits are defined with `@traitdef`:
 ```julia
@@ -246,7 +237,6 @@ function then dispatch may be dynamic.  This can be checked with
 `@check_fast_traitdispatch`, which checks whether the number of lines
 of LLVM code is the same for a trait function than a normal one:
 ```julia
-# julia 0.6
 checkfn(x) = rand()>0.5 ? true : false # a bit crazy!
 @traitdef TestTr{X}
 @traitimpl TestTr{X} <- checkfn(X)
@@ -281,7 +271,7 @@ directly.  Note that anything but a constant function will probably
 not be inlined away by the JIT and will lead to slower dynamic
 dispatch (see `@check_fast_traitdispatch` for a helper to check).
 
-Example leading to static dispatch (since Julia 0.6):
+Example leading to static dispatch:
 ```julia
 @traitdef IsBits{X}
 SimpleTraits.trait(::Type{IsBits{X1}}) where {X1} = isbits(X1) ? IsBits{X1} : Not{IsBits{X1}}
@@ -304,12 +294,13 @@ end
 ```
 What is allowed in generated functions is heavily restricted, see
 [Julia manual](https://docs.julialang.org/en/latest/manual/metaprogramming.html#Generated-functions-1).
-In particular (in Julia 0.6), no methods which are defined after the
+In particular, no methods which are defined after the
 generated function are allowed to be called inside the generated
 function, otherwise
 [this](https://github.com/JuliaLang/julia/issues/21356) issue is
-encountered.  Generally, try pure functions first and only in a pinch
-generated functions.
+encountered.  Generally, try non-generated functions first and only in a pinch
+generated functions.  See also
+[issue 40](https://github.com/mauro3/SimpleTraits.jl/issues/40).
 
 Note that these programmed-traits can be combined with `@traitimpl IsBits{XYZ}`,
 i.e. program the general case and add exceptions with `@traitimpl IsBits{XYZ}`.
@@ -329,9 +320,7 @@ end
 ```
 Note that this will lead to slower, dynamic dispatch, as
 the function is not pure (it depends on the global state of
-which types belong to the traits `IsNice` and `BelongTogether`).  (In
-Julia 0.5 one could use a generated function but not anymore in Julia 0.6.)
-
+which types belong to the traits `IsNice` and `BelongTogether`).
 
 Note also that trait functions can be generated functions:
 ```julia
@@ -425,8 +414,7 @@ minute introduction to Traits.jl and SimpleTraits.jl.
 
 The future of traits in Julia-Base: According to Stefan Karpinski's
 JuliaCon 2016 talk, [Julia 1.0](https://youtu.be/5gXMpbY1kJY), traits
-are scheduled to land after Julia 1.0.  Although, if someone gets
-cracking, they may well happen pre-1.0.  My crystal ball tells me that
+are scheduled to land after Julia 1.0.  My crystal ball tells me that
 all or most of the functionality of this package will be supported in
 the future trait system (multiparameter-traits may not be). Thus I
 expect the transition will be mostly a matter of a syntax update and
@@ -438,9 +426,7 @@ The future of this package: I see it as light-weight package focusing
 on letting functions use dispatch based on traits.  This dispatch is
 currently fairly limited, see section "Gotcha" above, but may be
 expanded in the future: either through something like in PR
-[m3/multitraits](https://github.com/mauro3/SimpleTraits.jl/pull/2) or
-through a more general generated-function approach (definitely not
-valid anymore in Julia 0.6).
+[m3/multitraits](https://github.com/mauro3/SimpleTraits.jl/pull/2).
 
 In the unlikely event that I find myself with too much time on my
 hands, I may try to develop a companion package to allow the
