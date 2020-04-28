@@ -61,15 +61,14 @@ Base.@deprecate_binding IsFastLinearIndex IsIndexLinear
 
 
 """
-Trait of all iterator types
+Trait of all iterator types.
 
-Note that this uses a generated function which queries `hasmethod`.  This is
-ill-defined behavior!  Although you might get away with it, see
-https://github.com/mauro3/SimpleTraits.jl/issues/40.
+NOTE: using this will lead to dynamic dispatch, see
+https://github.com/mauro3/SimpleTraits.jl/issues/40 for context.
 """
 @traitdef IsIterator{X}
-@generated function SimpleTraits.trait(::Type{IsIterator{X}}) where {X}
-    hasmethod(iterate, Tuple{X}) ? :(IsIterator{X}) : :(Not{IsIterator{X}})
+function SimpleTraits.trait(::Type{IsIterator{X}}) where {X}
+    hasmethod(iterate, Tuple{X}) ? IsIterator{X} : Not{IsIterator{X}}
 end
 
 end # module
