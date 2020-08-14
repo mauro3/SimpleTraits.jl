@@ -16,7 +16,7 @@ function hasline(bt, n)
             if (occursin("backtraces.jl", string(l1.file)) &&
                 l1.func == :foo &&
                 l1.line == n &&
-                contains(string(l2.file), "SimpleTraits.jl"))
+                occursin("SimpleTraits.jl", string(l2.file))) # for Julia v1.5 and greater: contains(string(l2.file), "SimpleTraits.jl"))
                 return true
             end
         end
