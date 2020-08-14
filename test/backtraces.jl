@@ -24,7 +24,7 @@ function hasline(bt, n)
     false
 end
 
-@test_broken hasline(foo(1), 6)
-@test_broken hasline(foo(1.0), 7)
+@test hasline(foo(1), 6)
+@test hasline(foo(1.0), 7)
 
 nothing

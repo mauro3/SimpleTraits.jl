@@ -185,7 +185,7 @@ end
 dispatch_cache = Dict()  # to ensure that the trait-dispatch function is defined only once per pair
 let
     global traitfn
-    function traitfn(tfn, macro_module)
+    function traitfn(tfn, __module__, __source__)
         # Need
         # f(x::X,Y::Y) where {X,Y} = f(trait(Tr1{X,Y}), x, y)
         # f(::False, x, y)= ...
@@ -314,32 +314,24 @@ let
             trait0_opposite = Expr(:call, :!, trait0)  # generate the opposite
             val = :(::Type{$trait})
         end
-        # Get line info for better backtraces
-        ln = findline(tfn)
-        if isa(ln, Expr)
-            pushloc = Expr(:meta, :push_loc, ln.args[2], fname, ln.args[1])
-            poploc = Expr(:meta, :pop_loc)
-        else
-           pushloc = poploc = nothing
-        end
         # create the function containing the logic.
-        retsym = gensym()
-        if hasmac
-            ex = :(Base.@__doc__ @dummy $fname($val, $(strip_kw(args1)...); $(kwargs...)) where {$(typs...)} = ($pushloc; $retsym = $fbody; $poploc; $retsym))
-            ex.args[findfirst(e->isexpr(e) && e.head==:macrocall, ex.args)].args[1] = mac # replace @dummy
+        # Note, this is where the line-number should point to.
+        head = MacroTools.prewalk(rmlines, :($fname($val, $(strip_kw(args1)...); $(kwargs...)) where {$(typs...)}))
+        ex = if hasmac
+            Expr(:macrocall, mac, __source__, :($head = $fbody))
         else
-            ex = :(Base.@__doc__ $fname($val, $(strip_kw(args1)...); $(kwargs...)) where {$(typs...)} = ($pushloc; $retsym = $fbody; $poploc; $retsym))
+            :($head = $fbody)
         end
-        # Create the trait dispatch function
-        key = (macro_module, fname, typs0, strip_kw(args0), trait0_opposite)
-        if !(key ∈ keys(dispatch_cache)) # define trait dispatch function
-            ex = if !haskwargs
+        # Create the trait dispatch function, if it has not been defined already. Add it to `ex`
+        key = (__module__, fname, typs0, strip_kw(args0), trait0_opposite)
+        dispatchfn = if !(key ∈ keys(dispatch_cache)) # define trait dispatch function
+            dispatch_cache[key] = (haskwargs, args0)
+            if !haskwargs
                 quote
                     $fname($(args1...)) where {$(typs...)} = (Base.@_inline_meta(); $fname($curmod.trait($trait),
                                                                                            $(strip_tpara(strip_kw(args1))...)
                                                                                            )
                                                               )
-                    $ex
                 end
             else
                 quote
@@ -348,26 +340,28 @@ let
                                                                                                      kwargs...
                                                                                                      )
                                                                         )
-                    $ex
                 end
             end
-            dispatch_cache[key] = (haskwargs, args0)
         else # trait dispatch function already defined
             if dispatch_cache[key][1]!=haskwargs
-                ex = :(error("""
-                             Trait-functions can have keyword arguments.
-                             But if so, add the same to both `Tr` and `!Tr`, but they can have different default values.
-                             """))
+                return :(error("""
+                               Trait-functions can have keyword arguments.
+                               But if so, add the same to both `Tr` and `!Tr`, but they can have different default values.
+                               """))
             end
             if dispatch_cache[key][2]!=args0
-                ex = :(error("""
-                             Trait-functions can have default arguments.
-                             But if so, add them to both `Tr` and `!Tr`, and they both need identical values!
-                             """))
+                return :(error("""
+                               Trait-functions can have default arguments.
+                               But if so, add them to both `Tr` and `!Tr`, and they both need identical values!
+                               """))
             end
             delete!(dispatch_cache, key) # permits function redefinition if that's what we want
+            nothing # dispatchfn
         end
-        ex
+        return rmlines(quote
+                       $dispatchfn
+                       Base.@__doc__ $ex
+                       end)
     end
 end
 
@@ -385,7 +379,7 @@ Defines a function dispatching on a trait. Examples:
 Note that the second example is just syntax sugar for `@traitfn f(x::X,y::Y) where {X,Y; Not{Tr1{X,Y}}} = ...`.
 """
 macro traitfn(tfn)
-    esc(traitfn(tfn, __module__))
+    esc(traitfn(tfn, __module__, __source__))
 end
 
 ######
