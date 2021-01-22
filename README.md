@@ -2,6 +2,11 @@
 
 [![Build Status](https://travis-ci.com/mauro3/SimpleTraits.jl.svg?branch=master)](https://travis-ci.com/mauro3/SimpleTraits.jl)
 [![Build Status](https://ci.appveyor.com/api/projects/status/github/mauro3/SimpleTraits.jl?branch=master&svg=true)](https://ci.appveyor.com/project/mauro3/simpletraits-jl/branch/master)
+[![pkgeval](https://juliahub.com/docs/SimpleTraits/pkgeval.svg)](https://juliahub.com/ui/Packages/SimpleTraits/pLp8z)
+
+[![deps](https://juliahub.com/docs/SimpleTraits/deps.svg)](https://juliahub.com/ui/Packages/SimpleTraits/pLp8z?t=2)
+[![version](https://juliahub.com/docs/SimpleTraits/version.svg)](https://juliahub.com/ui/Packages/SimpleTraits/pLp8z)
+
 [NEWS](NEWS.md)
 <!-- Code coverage not possible due to testing -->
 
