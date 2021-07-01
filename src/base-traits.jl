@@ -21,7 +21,7 @@ Base.@pure _isbits(X) = isbitstype(X)
 "Trait of all immutable types"
 @traitdef IsImmutable{X}
 if VERSION >= v"1.7.0-DEV.1279"
-    Base.@pure _isimmutable(x) = !(x.name.flags & 0x2 == 0x2)
+    Base.@pure _isimmutable(X) = !(Base.ismutabletype(X))
 else
     Base.@pure _isimmutable(X) = isimmutable(X)
 end
