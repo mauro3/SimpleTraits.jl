@@ -23,7 +23,7 @@ Base.@pure _isbits(X) = isbitstype(X)
 if VERSION >= v"1.7.0-DEV.1279"
     Base.@pure _isimmutable(X) = !(Base.ismutabletype(X))
 else
-    Base.@pure _isimmutable(X) = isimmutable(X)
+    Base.@pure _isimmutable(X) = !X.mutable
 end
 @traitimpl IsImmutable{X}  <- _isimmutable(X)
 
