@@ -15,12 +15,16 @@ export IsLeafType, IsConcrete, IsBits, IsImmutable, IsContiguous, IsIndexLinear,
 
 "Trait of all isbits-types"
 @traitdef IsBits{X}
-Base.@pure _isbits(X) = X.isbitstype
+Base.@pure _isbits(X) = isbitstype(X)
 @traitimpl IsBits{X} <- _isbits(X)
 
 "Trait of all immutable types"
 @traitdef IsImmutable{X}
-Base.@pure _isimmutable(X) = !X.mutable
+if VERSION >= v"1.7.0-DEV.1279"
+    Base.@pure _isimmutable(X) = !(Base.ismutabletype(X))
+else
+    Base.@pure _isimmutable(X) = !X.mutable
+end
 @traitimpl IsImmutable{X}  <- _isimmutable(X)
 
 "Trait of all callable objects"
