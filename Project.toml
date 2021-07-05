@@ -1,7 +1,7 @@
 name = "SimpleTraits"
 uuid = "699a6c99-e7fa-54fc-8d76-47d257e15c1d"
 author = ["Mauro Werder <mauro3@runbox.com>"]
-version = "0.9.3"
+version = "0.9.4"
 
 [deps]
 InteractiveUtils = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
