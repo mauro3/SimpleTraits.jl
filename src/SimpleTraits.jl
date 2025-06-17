@@ -6,7 +6,7 @@ import InteractiveUtils
 # This is basically just adding a few convenience functions & macros
 # around Holy Traits.
 
-export Trait, istrait, @traitdef, @traitimpl, @traitfn, Not, @check_fast_traitdispatch
+export Trait, istrait, @traitdef, @traitimpl, @traitfn, NotTrait, @check_fast_traitdispatch
 
 # All traits are concrete subtypes of this trait.  SUPER is not used
 # but present to be compatible with Traits.jl.
@@ -30,28 +30,28 @@ future compatibility.)
 """
 Trait
 
-abstract type Not{T<:Trait} <: Trait end
+abstract type NotTrait{T<:Trait} <: Trait end
 
 """
 The set of all types not belonging to a trait is encoded by wrapping
-it with Not{}, e.g.  Not{Tr1{X,Y}}
+it with NotTrait{}, e.g.  NotTrait{Tr1{X,Y}}
 """
-Not
+NotTrait
 
-# Helper to strip an even number of Not{}s off: Not{Not{T}}->T
-stripNot(::Type{T}) where {T<:Trait} = T
-stripNot(::Type{Not{T}}) where {T<:Trait} = Not{T}
-stripNot(::Type{Not{Not{T}}}) where {T<:Trait} = stripNot(T)
+# Helper to strip an even number of NotTrait{}s off: NotTrait{NotTrait{T}}->T
+stripNotTrait(::Type{T}) where {T<:Trait} = T
+stripNotTrait(::Type{NotTrait{T}}) where {T<:Trait} = NotTrait{T}
+stripNotTrait(::Type{NotTrait{NotTrait{T}}}) where {T<:Trait} = stripNotTrait(T)
 
 """
 A trait is defined as full-filled if this function is the identity
 function for that trait.  Otherwise it returns the trait wrapped in
-`Not`.
+`NotTrait`.
 
 Example:
 ```
 trait(IsBits{Int}) # returns IsBits{Int}
-trait(IsBits{Array}) # returns Not{IsBits{Array}}
+trait(IsBits{Array}) # returns NotTrait{IsBits{Array}}
 ```
 
 Usually this function is defined when using the `@traitimpl` macro.
@@ -59,8 +59,8 @@ Usually this function is defined when using the `@traitimpl` macro.
 However, instead of using `@traitimpl` one can define a method for
 `trait` to implement a trait, see the README.
 """
-trait(::Type{T}) where {T<:Trait} = Not{T}
-trait(::Type{Not{T}}) where {T<:Trait} = trait(T)
+trait(::Type{T}) where {T<:Trait} = NotTrait{T}
+trait(::Type{NotTrait{T}}) where {T<:Trait} = trait(T)
 
 ## Under the hood, a trait is then implemented for specific types by
 ## defining:
@@ -79,7 +79,7 @@ istrait(Tr1{Int,Float64}) => return true or false
 ```
 """
 istrait(::Any) = error("Argument is not a Trait.")
-istrait(tr::Type{T}) where {T<:Trait} = trait(tr)==stripNot(tr) ? true : false # Problem, this can run into issue #265
+istrait(tr::Type{T}) where {T<:Trait} = trait(tr)==stripNotTrait(tr) ? true : false # Problem, this can run into issue #265
                                                                         # thus is redefine when traits are defined
 """
 
@@ -129,7 +129,7 @@ macro traitimpl(tr)
     if tr.head==:curly || (tr.head==:call && tr.args[1]==:!)
         # makes
         # trait{X1<:Int,X2<:Float64}(::Type{Tr1{X1,X2}}) = Tr1{X1,X2}
-        if tr.args[1]==:Not || isnegated(tr)
+        if tr.args[1]==:NotTrait || isnegated(tr)
             tr = tr.args[2]
             negated = true
         else
@@ -153,14 +153,14 @@ macro traitimpl(tr)
             end
         else
             return quote
-                $fnhead = Not{$trname{$(paras...)}}
+                $fnhead = NotTrait{$trname{$(paras...)}}
                 nothing
             end
         end
     elseif tr.head==:call
         @assert tr.args[1]==:<
         negated,Tr,P1,fn,P2 = @match tr begin
-            Not{Tr_{P1__}} <- fn_(P2__) => (true, Tr, P1, fn, P2)
+            NotTrait{Tr_{P1__}} <- fn_(P2__) => (true, Tr, P1, fn, P2)
             Tr_{P1__} <- fn_(P2__) => (false, Tr, P1, fn, P2)
         end
         if negated
@@ -168,7 +168,7 @@ macro traitimpl(tr)
         end
         return esc(quote
                    function SimpleTraits.trait(::Type{$Tr{$(P1...)}}) where {$(P1...)}
-                       return $fn($(P2...)) ? $Tr{$(P1...)} : Not{$Tr{$(P1...)}}
+                       return $fn($(P2...)) ? $Tr{$(P1...)} : NotTrait{$Tr{$(P1...)}}
                    end
                    nothing
                    end)
@@ -180,7 +180,7 @@ end
 # Defining a function dispatching on the trait (or not)
 # @traitfn f(x::X,y::Y) where {X,Y;  Tr1{X,Y}} = ...
 # @traitfn f(x::X,y::Y) where {X,Y; !Tr1{X,Y}} = ... # which is just sugar for:
-# @traitfn f(x::X,y::Y) where {X,Y; Not{Tr1{X,Y}}} = ...
+# @traitfn f(x::X,y::Y) where {X,Y; NotTrait{Tr1{X,Y}}} = ...
 
 dispatch_cache = Dict()  # to ensure that the trait-dispatch function is defined only once per pair
 let
@@ -309,7 +309,7 @@ let
         if isnegated(trait)
             trait0_opposite = trait0 # opposite of `trait` below as that gets stripped of !
             trait = trait.args[2]
-            val = :(::Type{$curmod.Not{$trait}})
+            val = :(::Type{$curmod.NotTrait{$trait}})
         else
             trait0_opposite = Expr(:call, :!, trait0)  # generate the opposite
             val = :(::Type{$trait})
@@ -376,7 +376,7 @@ Defines a function dispatching on a trait. Examples:
 @traitfn f(x::X,y::Y) where {X,Y; !Tr2{X,Y}} = ...
 ```
 
-Note that the second example is just syntax sugar for `@traitfn f(x::X,y::Y) where {X,Y; Not{Tr1{X,Y}}} = ...`.
+Note that the second example is just syntax sugar for `@traitfn f(x::X,y::Y) where {X,Y; NotTrait{Tr1{X,Y}}} = ...`.
 """
 macro traitfn(tfn)
     esc(traitfn(tfn, __module__, __source__))

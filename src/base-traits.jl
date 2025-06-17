@@ -72,7 +72,7 @@ https://github.com/mauro3/SimpleTraits.jl/issues/40 for context.
 """
 @traitdef IsIterator{X}
 function SimpleTraits.trait(::Type{IsIterator{X}}) where {X}
-    hasmethod(iterate, Tuple{X}) ? IsIterator{X} : Not{IsIterator{X}}
+    hasmethod(iterate, Tuple{X}) ? IsIterator{X} : NotTrait{IsIterator{X}}
 end
 
 end # module
