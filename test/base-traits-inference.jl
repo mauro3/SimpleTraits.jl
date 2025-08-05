@@ -12,14 +12,12 @@ basetrs = [:IsConcrete=>:Int,
            :IsIndexLinear=>:(Vector{Int}),
            :IsAnything=>:Int,
            :IsNothing=>:Int,
-           :IsCallable=>:(typeof(sin))]
+           :IsCallable=>:(typeof(sin)),
+           :IsIterator=>:(Dict{Int,Int})]
 
 
 for (bt, tp) in basetrs
+    # IsIterator was not inferable until some Julia version before 1.10
+    VERSION<v"1.10" && bt==:IsIterator && continue
     @test @eval @check_fast_traitdispatch $bt $tp true
 end
-
-# IsIterator used dynamic dispatch as hasmethod is not inferable,
-# see https://github.com/mauro3/SimpleTraits.jl/issues/40.
-println("""One statement of "Number of llvm code lines X but should be Y." is expected:""")
-@test !(@eval @check_fast_traitdispatch IsIterator Dict{Int,Int} true)
