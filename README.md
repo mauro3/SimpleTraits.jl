@@ -248,7 +248,7 @@ checkfn(x) = rand()>0.5 ? true : false # a bit crazy!
 # this tests a trait-function with TestTr{Int}:
 @check_fast_traitdispatch TestTr
 # this tests a trait-function with TestTr{String} and will
-# also prints number of LLCM-IR lines of trait vs normal function:
+# also prints number of LLVM-IR lines of trait vs normal function:
 @check_fast_traitdispatch TestTr String true
 
 # Now this is fast:
