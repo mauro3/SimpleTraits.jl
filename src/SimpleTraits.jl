@@ -79,8 +79,8 @@ istrait(Tr1{Int,Float64}) => return true or false
 ```
 """
 istrait(::Any) = error("Argument is not a Trait.")
-istrait(tr::Type{T}) where {T<:Trait} = trait(tr) == stripNot(tr) ? true : false # Problem, this can run into issue #265
-# thus is redefine when traits are defined
+istrait(tr::Type{T}) where {T<:Trait} = trait(tr)==stripNot(tr) ? true : false # Problem, this can run into issue #265
+                                                                        # thus is redefine when traits are defined
 """
 
 Used to define a trait.  Traits, like types, are camel cased.  I
@@ -126,10 +126,10 @@ override an implementation with the latter method.  Thus it can be
 used to define exceptions to the rule.
 """
 macro traitimpl(tr)
-    if tr.head == :curly || (tr.head == :call && tr.args[1] == :!)
+    if tr.head==:curly || (tr.head==:call && tr.args[1]==:!)
         # makes
         # trait{X1<:Int,X2<:Float64}(::Type{Tr1{X1,X2}}) = Tr1{X1,X2}
-        if tr.args[1] == :Not || isnegated(tr)
+        if tr.args[1]==:Not || isnegated(tr)
             tr = tr.args[2]
             negated = true
         else
@@ -139,7 +139,7 @@ macro traitimpl(tr)
         trname = esc(tr.args[1])
         curly = Any[]
         paras = Any[]
-        for (ty, v) in zip(typs, GenerateTypeVars{:upcase}())
+        for (ty,v) in zip(typs, GenerateTypeVars{:upcase}())
             push!(curly, Expr(:(<:), esc(v), esc(ty)))  #:($v<:$ty)
             push!(paras, esc(v))
         end
@@ -157,21 +157,21 @@ macro traitimpl(tr)
                 nothing
             end
         end
-    elseif tr.head == :call
-        @assert tr.args[1] == :<
-        negated, Tr, P1, fn, P2 = @match tr begin
-            Not{Tr_{P1__}} < -fn_(P2__) => (true, Tr, P1, fn, P2)
-            Tr_{P1__} < -fn_(P2__) => (false, Tr, P1, fn, P2)
+    elseif tr.head==:call
+        @assert tr.args[1]==:<
+        negated,Tr,P1,fn,P2 = @match tr begin
+            Not{Tr_{P1__}} <- fn_(P2__) => (true, Tr, P1, fn, P2)
+            Tr_{P1__} <- fn_(P2__) => (false, Tr, P1, fn, P2)
         end
         if negated
             fn = Expr(:call, GlobalRef(SimpleTraits, :!), fn)
         end
         return esc(quote
-            function SimpleTraits.trait(::Type{$Tr{$(P1...)}}) where {$(P1...)}
-                return $fn($(P2...)) ? $Tr{$(P1...)} : $curmod.Not{$Tr{$(P1...)}}
-            end
-            nothing
-        end)
+                   function SimpleTraits.trait(::Type{$Tr{$(P1...)}}) where {$(P1...)}
+                       return $fn($(P2...)) ? $Tr{$(P1...)} : $curmod.Not{$Tr{$(P1...)}}
+                   end
+                   nothing
+                   end)
     else
         error("Cannot parse $tr")
     end
@@ -189,7 +189,7 @@ let
         # Need
         # f(x::X,Y::Y) where {X,Y} = f(trait(Tr1{X,Y}), x, y)
         # f(::False, x, y)= ...
-        if tfn.head == :macrocall
+        if tfn.head==:macrocall
             hasmac = true
             mac = tfn.args[1]
             tfn = tfn.args[3]
@@ -216,29 +216,29 @@ let
 
         # TODO 1.0: remove
         out = @match fhead begin
-            f_(args0__; kwargs__) => (f, [], args0, kwargs)
-            f_(args0__) => (f, [], args0, [])
-            f_(args0__; kwargs__) where {paras__} => (f, paras, args0, kwargs)
-            f_(args0__) where {paras__} => (f, paras, args0, [])
+            f_(args0__; kwargs__)               => (f,[],args0,kwargs)
+            f_(args0__)                         => (f,[],args0,[])
+            f_(args0__; kwargs__) where paras__ => (f,paras,args0,kwargs)
+            f_(args0__) where paras__           => (f,paras,args0,[])
         end
-        if out == nothing
+        if out==nothing
             error("Could not parse function-head: $fhead. Note that several `where` are not supported.")
         end
         fname, paras, args0, kwargs = out
-        haskwargs = length(kwargs) > 0
+        haskwargs = length(kwargs)>0
         # extract parameters and traits from paras and/or args0
 
-        if length(paras) == 0
+        if length(paras)==0
             maybe_traitor = true
         else
-            if paras[1] isa Expr && paras[1].head == :parameters
+            if paras[1] isa Expr && paras[1].head==:parameters
                 maybe_traitor = false
-                length(paras) < 2 && error("Cannot parse function parameters: $para")
+                length(paras)<2 && error("Cannot parse function parameters: $para")
                 typs = paras[2:end]
                 trait = paras[1].args[1]
-            elseif paras[1] isa Expr && paras[1].head == :bracescat
+            elseif paras[1] isa Expr && paras[1].head==:bracescat
                 maybe_traitor = false
-                length(paras) != 1 && error("Cannot parse function parameters: $para")
+                length(paras)!=1 && error("Cannot parse function parameters: $para")
                 typs = paras[1].args[1:1]
                 trait = paras[1].args[2]
             else
@@ -260,28 +260,28 @@ let
             vararg = false
             for outer i in eachindex(args0)
                 a = args0[i]
-                vararg = a.head == :...
+                vararg = a.head==:...
                 if vararg
                     a = a.args[1]
                 end
                 out = @match a begin
-                    ::::Tr_ => (nothing, nothing, Tr)
-                    ::T_::Tr_ => (nothing, T, Tr)
-                    x_Symbol::::Tr_ => (x, nothing, Tr)
-                    x_Symbol::T_::Tr_ => (x, T, Tr)
+                    ::::Tr_           => (nothing,nothing,Tr)
+                    ::T_::Tr_         => (nothing,T,Tr)
+                    x_Symbol::::Tr_   => (x,nothing,Tr)
+                    x_Symbol::T_::Tr_ => (x,T,Tr)
                 end
-                out != nothing && break
+                out!=nothing && break
             end
-            out == nothing && error("No trait found in function signature")
-            arg, typ, trait0 = out
-            if typ === nothing # case `f(x::::Tr)`
+            out==nothing && error("No trait found in function signature")
+            arg,typ,trait0 = out
+            if typ===nothing # case `f(x::::Tr)`
                 typ = gensym()
                 push!(typs, typ)
-            elseif length(typs) == 0 # case `f(x::Integer::Tr)`
-                # needs to be put into `f(x::I::Tr) where I<:Integer`
-                typ_ = typ
-                typ = gensym()
-                push!(typs, :($typ <: $typ_))
+            elseif length(typs)==0 # case `f(x::Integer::Tr)`
+                    # needs to be put into `f(x::I::Tr) where I<:Integer`
+                    typ_ = typ
+                    typ = gensym()
+                    push!(typs, :($typ<:$typ_))
             end
             # Note other cases, e.g.
             # f(x::T::Tr) where T
@@ -296,11 +296,11 @@ let
             end
             args1 = deepcopy(args0)
             if vararg
-                args0[i] = arg == nothing ? nothing : :($arg...,).args[1]
-                args1[i] = arg == nothing ? :(::$typ...,).args[1] : :($arg::$typ...,).args[1]
+                args0[i] = arg==nothing ? nothing : :($arg...,).args[1]
+                args1[i] = arg==nothing ? :(::$typ...,).args[1] : :($arg::$typ...,).args[1]
             else
-                args0[i] = arg == nothing ? nothing : :($arg)
-                args1[i] = arg == nothing ? :(::$typ) : :($arg::$typ)
+                args0[i] = arg==nothing ? nothing : :($arg)
+                args1[i] = arg==nothing ? :(::$typ) : :($arg::$typ)
             end
             args1 = insertdummy(args1)
         end # Traitor.jl-style function
@@ -328,30 +328,28 @@ let
             dispatch_cache[key] = (haskwargs, args0)
             if !haskwargs
                 quote
-                    $fname($(args1...)) where {$(typs...)} = (Base.@_inline_meta();
-                    $fname($curmod.trait($trait),
-                        $(strip_tpara(strip_kw(args1))...)
-                    )
-                    )
+                    $fname($(args1...)) where {$(typs...)} = (Base.@_inline_meta(); $fname($curmod.trait($trait),
+                                                                                           $(strip_tpara(strip_kw(args1))...)
+                                                                                           )
+                                                              )
                 end
             else
                 quote
-                    $fname($(args1...); kwargs...) where {$(typs...)} = (Base.@_inline_meta();
-                    $fname($curmod.trait($trait),
-                        $(strip_tpara(strip_kw(args1))...);
-                        kwargs...
-                    )
-                    )
+                    $fname($(args1...);kwargs...) where {$(typs...)} = (Base.@_inline_meta(); $fname($curmod.trait($trait),
+                                                                                                     $(strip_tpara(strip_kw(args1))...);
+                                                                                                     kwargs...
+                                                                                                     )
+                                                                        )
                 end
             end
         else # trait dispatch function already defined
-            if dispatch_cache[key][1] != haskwargs
+            if dispatch_cache[key][1]!=haskwargs
                 return :(error("""
                                Trait-functions can have keyword arguments.
                                But if so, add the same to both `Tr` and `!Tr`, but they can have different default values.
                                """))
             end
-            if dispatch_cache[key][2] != args0
+            if dispatch_cache[key][2]!=args0
                 return :(error("""
                                Trait-functions can have default arguments.
                                But if so, add them to both `Tr` and `!Tr`, and they both need identical values!
@@ -361,9 +359,9 @@ let
             nothing # dispatchfn
         end
         return rmlines(quote
-            $dispatchfn
-            Base.@__doc__ $ex
-        end)
+                       $dispatchfn
+                       Base.@__doc__ $ex
+                       end)
     end
 end
 
@@ -389,7 +387,7 @@ end
 ######
 
 # true if :(!(Tr{x}))
-isnegated(t::Expr) = t.head == :call
+isnegated(t::Expr) = t.head==:call
 isnegated(t::Symbol) = false
 
 # [:(x::X)] -> [:x]
@@ -397,12 +395,12 @@ isnegated(t::Symbol) = false
 strip_tpara(args::Vector) = Any[strip_tpara(a) for a in args]
 strip_tpara(a::Symbol) = a
 function strip_tpara(a::Expr)
-    if a.head == :(::)
+    if a.head==:(::)
         return a.args[1]
-    elseif a.head == :...
+    elseif a.head==:...
         return Expr(:..., strip_tpara(a.args[1]))
-    elseif a.head == :kw
-        @assert length(a.args) == 2
+    elseif a.head==:kw
+        @assert length(a.args)==2
         return Expr(:kw, strip_tpara(a.args[1]), a.args[2])
     else
         error("Cannot parse argument: $a")
@@ -416,10 +414,10 @@ end
 strip_kw(args::Vector) = Any[strip_kw(a) for a in args]
 strip_kw(a) = a
 function strip_kw(a::Expr)
-    if a.head == :(::) || a.head == :...
+    if a.head==:(::) || a.head==:...
         return a
-    elseif a.head == :kw
-        @assert length(a.args) == 2
+    elseif a.head==:kw
+        @assert length(a.args)==2
         return a.args[1]
     else
         error("Cannot parse argument: $a")
@@ -433,9 +431,9 @@ end
 insertdummy(args::Vector) = Any[insertdummy(a) for a in args]
 insertdummy(a::Symbol) = a
 function insertdummy(a::Expr)
-    if a.head == :(::) && length(a.args) == 1
+    if a.head==:(::) && length(a.args)==1
         return Expr(:(::), gensym(), a.args[1])
-    elseif a.head == :...
+    elseif a.head==:...
         return Expr(:..., insertdummy(a.args[1]))
     else
         return a
@@ -444,8 +442,8 @@ end
 
 # generates: X1, X2,... or x1, x2.... (just symbols not actual TypeVar)
 struct GenerateTypeVars{CASE} end
-Base.iterate(::GenerateTypeVars{:upcase}, state=1) = (Symbol("X$state"), state + 1) # X1,..
-Base.iterate(::GenerateTypeVars{:lcase}, state=1) = (Symbol("x$state"), state + 1)  # x1,...
+Base.iterate(::GenerateTypeVars{:upcase}, state=1) = (Symbol("X$state"), state+1) # X1,..
+Base.iterate(::GenerateTypeVars{:lcase}, state=1) = (Symbol("x$state"), state+1)  # x1,...
 
 ####
 # Annotating the source location
@@ -501,7 +499,7 @@ TODO: This is rather ugly.  Ideally this would be a function but I ran
 into problems, see source code.  Also the macro is ugly.  PRs welcome...
 """
 macro check_fast_traitdispatch(Tr, Arg=:Int, verbose=false)
-    if Base.JLOptions().code_coverage == 1
+    if Base.JLOptions().code_coverage==1
         @warn "The SimpleTraits.@check_fast_traitdispatch macro only works when running Julia without --code-coverage"
         return nothing
     end
@@ -529,7 +527,7 @@ function llvm_lines(fn, args)
     io = IOBuffer()
     InteractiveUtils.code_llvm(io, fn, args)
     #Base.code_native(io, fn, args)
-    count(c -> c == '\n', String(take!(copy(io))))
+    count(c->c=='\n', String(take!(copy(io))))
 end
 
 include("base-traits.jl")
