@@ -1,0 +1,8 @@
+[deps]
+InvertedIndices = "41ab1584-1d38-5bbf-9106-f11c6c58b48f"
+Markdown = "d6f4376e-aef5-505a-96c1-9c027394607a"
+SimpleTraits = "699a6c99-e7fa-54fc-8d76-47d257e15c1d"
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[sources]
+SimpleTraits = { path = ".." }

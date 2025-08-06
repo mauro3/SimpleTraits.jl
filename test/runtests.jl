@@ -279,3 +279,14 @@ include("backtraces.jl")
     @traitfn f(x::Integer::T18) = 1
     @test f(5)==1
 end
+
+@testset "Issue #91: Compatibility with InvertedIndices.jl" begin
+    using InvertedIndices
+    @traitdef T91{X}
+    @traitimpl T91{Int64}
+    f91(::Integer) = 9
+    @traitfn f91(::X) where {X <: Integer; T91{X}} = 8
+    @test begin
+        f91(Int64(5)) == 8
+    end
+end
