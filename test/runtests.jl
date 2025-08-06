@@ -1,6 +1,6 @@
 using SimpleTraits
 using Test
-using Markdown, .Docs
+using Markdown
 
 const trait = SimpleTraits.trait
 
