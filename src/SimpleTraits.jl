@@ -1,6 +1,5 @@
 module SimpleTraits
 using MacroTools
-const curmod = nameof(@__MODULE__)
 import InteractiveUtils
 
 # This is basically just adding a few convenience functions & macros
@@ -144,8 +143,8 @@ macro traitimpl(tr)
             push!(paras, esc(v))
         end
         arg = :(::Type{$trname{$(paras...)}})
-        fnhead = :($curmod.trait($arg) where {$(curly...)})
-        isfnhead = :($curmod.istrait($arg) where {$(curly...)})
+        fnhead = :(SimpleTraits.trait($arg) where {$(curly...)})
+        isfnhead = :(SimpleTraits.istrait($arg) where {$(curly...)})
         if !negated
             return quote
                 $fnhead = $trname{$(paras...)}
@@ -168,7 +167,7 @@ macro traitimpl(tr)
         end
         return esc(quote
                    function SimpleTraits.trait(::Type{$Tr{$(P1...)}}) where {$(P1...)}
-                       return $fn($(P2...)) ? $Tr{$(P1...)} : Not{$Tr{$(P1...)}}
+                       return $fn($(P2...)) ? $Tr{$(P1...)} : SimpleTraits.Not{$Tr{$(P1...)}}
                    end
                    nothing
                    end)
@@ -309,7 +308,7 @@ let
         if isnegated(trait)
             trait0_opposite = trait0 # opposite of `trait` below as that gets stripped of !
             trait = trait.args[2]
-            val = :(::Type{$curmod.Not{$trait}})
+            val = :(::Type{SimpleTraits.Not{$trait}})
         else
             trait0_opposite = Expr(:call, :!, trait0)  # generate the opposite
             val = :(::Type{$trait})
@@ -328,14 +327,14 @@ let
             dispatch_cache[key] = (haskwargs, args0)
             if !haskwargs
                 quote
-                    $fname($(args1...)) where {$(typs...)} = (Base.@_inline_meta(); $fname($curmod.trait($trait),
+                    $fname($(args1...)) where {$(typs...)} = (Base.@_inline_meta(); $fname(SimpleTraits.trait($trait),
                                                                                            $(strip_tpara(strip_kw(args1))...)
                                                                                            )
                                                               )
                 end
             else
                 quote
-                    $fname($(args1...);kwargs...) where {$(typs...)} = (Base.@_inline_meta(); $fname($curmod.trait($trait),
+                    $fname($(args1...);kwargs...) where {$(typs...)} = (Base.@_inline_meta(); $fname(SimpleTraits.trait($trait),
                                                                                                      $(strip_tpara(strip_kw(args1))...);
                                                                                                      kwargs...
                                                                                                      )
