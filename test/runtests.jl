@@ -289,4 +289,5 @@ end
     @test begin
         f91(Int64(5)) == 8
     end
+    @test_broken f91(Int32(5)) == 9
 end
