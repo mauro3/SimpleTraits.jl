@@ -17,6 +17,7 @@ basetrs = [:IsConcrete=>:Int,
 
 
 for (bt, tp) in basetrs
+    @show bt
     # IsIterator was not inferable until some Julia version before 1.10
     VERSION<v"1.10" && bt==:IsIterator && continue
     @test @eval @check_fast_traitdispatch $bt $tp true
