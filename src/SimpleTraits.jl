@@ -157,10 +157,12 @@ macro traitimpl(tr)
             end
         end
     elseif tr.head==:call
-        @assert tr.args[1]==:<
+        @assert tr.args[1]==:< || tr.args[1]==:←
         negated, Tr, P1, fn, P2 = @match tr begin
             Not{Tr_{P1__}} < - fn_(P2__) => (true, Tr, P1, fn, P2)
-            Tr_{P1__} < - fn_(P2__) => (false, Tr, P1, fn, P2)
+            Tr_{P1__} < - fn_(P2__)      => (false, Tr, P1, fn, P2)
+            Not{Tr_{P1__}} ← fn_(P2__) => (true, Tr, P1, fn, P2)
+            Tr_{P1__} ← fn_(P2__)      => (false, Tr, P1, fn, P2)
         end
         if negated
             fn = Expr(:call, GlobalRef(SimpleTraits, :!), fn)

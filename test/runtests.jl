@@ -247,6 +247,11 @@ isarrow(X) = eltype(X)<:Integer ? true : false
 @test !istrait(TrArrow2{Vector{Int}})
 @test istrait(TrArrow2{Vector{Float64}})
 
+@traitdef TrArrow3{X}
+@traitimpl Not{TrArrow3{X}} ← isarrow(X)
+@test !istrait(TrArrow3{Vector{Int}})
+@test istrait(TrArrow3{Vector{Float64}})
+
 ####
 # issue with key in dispatch_cache
 @traitfn f_dc(::::Tr1) = 1

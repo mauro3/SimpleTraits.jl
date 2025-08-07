@@ -6,16 +6,16 @@ export IsLeafType, IsConcrete, IsBits, IsImmutable, IsContiguous, IsIndexLinear,
 
 "Trait which contains all types"
 @traitdef IsAnything{X}
-@traitimpl IsAnything{X} < - (x->true)(X)
+@traitimpl IsAnything{X} ← (x->true)(X)
 
 "Trait which contains no types"
 @traitdef IsNothing{X}
-@traitimpl IsNothing{X} < - (x->false)(X)
+@traitimpl IsNothing{X} ← (x->false)(X)
 
 "Trait of all isbits-types"
 @traitdef IsBits{X}
 _isbits(X) = isbitstype(X)
-@traitimpl IsBits{X} < - _isbits(X)
+@traitimpl IsBits{X} ← _isbits(X)
 
 "Trait of all immutable types"
 @traitdef IsImmutable{X}
@@ -24,21 +24,21 @@ if VERSION >= v"1.7.0-DEV.1279"
 else
     _isimmutable(X) = !X.mutable
 end
-@traitimpl IsImmutable{X} < - _isimmutable(X)
+@traitimpl IsImmutable{X} ← _isimmutable(X)
 
 "Trait of all callable objects"
 @traitdef IsCallable{X}
-@traitimpl IsCallable{X} < - (X->(X<:Function || length(methods(X))>0))(X)
+@traitimpl IsCallable{X} ← (X->(X<:Function || length(methods(X))>0))(X)
 
 "Trait of all concrete types types"
 @traitdef IsConcrete{X}
-@traitimpl IsConcrete{X} < - isconcretetype(X)
+@traitimpl IsConcrete{X} ← isconcretetype(X)
 
 Base.@deprecate_binding IsLeafType IsConcrete
 
 "Types which have contiguous memory layout"
 @traitdef IsContiguous{X} # https://github.com/JuliaLang/julia/issues/10889
-@traitimpl IsContiguous{X} < - Base.iscontiguous(X)
+@traitimpl IsContiguous{X} ← Base.iscontiguous(X)
 
 "Array indexing trait."
 @traitdef IsIndexLinear{X} # https://github.com/JuliaLang/julia/pull/8432
@@ -51,7 +51,7 @@ function isindexlinear(X)
         error("Not recognized")
     end
 end
-@traitimpl IsIndexLinear{X} < - isindexlinear(X)
+@traitimpl IsIndexLinear{X} ← isindexlinear(X)
 
 Base.@deprecate_binding IsFastLinearIndex IsIndexLinear
 
