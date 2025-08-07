@@ -228,11 +228,20 @@ struct C9<:A9 end
 # traitfn with docstring
 "Test documentation 1"
 @traitfn f13(x::X) where {X;Tr1{X}} = 1
-@test_broken doc"Test documentation 1\n" == repr("text/plain", @doc(f13))
+@show typeof(@doc(f13))
+if VERSION<v"1.11"
+    @test "Test documentation 1\n" == string(@doc(f13))
+else
+    @test "Test documentation 1" == (@doc(f13)).text[1]
+end
 
 "Test documentation 2"
 @traitfn @generated f14(x::X) where {X;Tr1{X}} = 1
-@test_broken "Test documentation 2\n" == string(@doc(f14))
+if VERSION<v"1.11"
+    @test "Test documentation 2\n" == string(@doc(f14))
+else
+    @test "Test documentation 2" == (@doc(f14)).text[1]
+end
 
 ###
 # @traitimpl Tr{X} <- istr(X)
