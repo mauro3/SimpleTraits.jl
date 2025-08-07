@@ -79,7 +79,7 @@ istrait(Tr1{Int,Float64}) => return true or false
 """
 istrait(::Any) = error("Argument is not a Trait.")
 istrait(tr::Type{T}) where {T<:Trait} = trait(tr)==stripNot(tr) ? true : false # Problem, this can run into issue #265
-                                                                        # thus is redefine when traits are defined
+# thus is redefine when traits are defined
 """
 
 Used to define a trait.  Traits, like types, are camel cased.  I
@@ -138,7 +138,7 @@ macro traitimpl(tr)
         trname = esc(tr.args[1])
         curly = Any[]
         paras = Any[]
-        for (ty,v) in zip(typs, GenerateTypeVars{:upcase}())
+        for (ty, v) in zip(typs, GenerateTypeVars{:upcase}())
             push!(curly, Expr(:(<:), esc(v), esc(ty)))  #:($v<:$ty)
             push!(paras, esc(v))
         end
@@ -158,18 +158,18 @@ macro traitimpl(tr)
         end
     elseif tr.head==:call
         @assert tr.args[1]==:<
-        negated,Tr,P1,fn,P2 = @match tr begin
-            Not{Tr_{P1__}} <- fn_(P2__) => (true, Tr, P1, fn, P2)
-            Tr_{P1__} <- fn_(P2__) => (false, Tr, P1, fn, P2)
+        negated, Tr, P1, fn, P2 = @match tr begin
+            Not{Tr_{P1__}} < - fn_(P2__) => (true, Tr, P1, fn, P2)
+            Tr_{P1__} < - fn_(P2__) => (false, Tr, P1, fn, P2)
         end
         if negated
             fn = Expr(:call, GlobalRef(SimpleTraits, :!), fn)
         end
         return esc(quote
-                   function SimpleTraits.trait(::Type{$Tr{$(P1...)}}) where {$(P1...)}
-                       return $fn($(P2...)) ? $Tr{$(P1...)} : SimpleTraits.Not{$Tr{$(P1...)}}
-                   end
-                   nothing
+                       function SimpleTraits.trait(::Type{$Tr{$(P1...)}}) where {$(P1...)}
+                           return $fn($(P2...)) ? $Tr{$(P1...)} : SimpleTraits.Not{$Tr{$(P1...)}}
+                       end
+                       nothing
                    end)
     else
         error("Cannot parse $tr")
@@ -215,10 +215,10 @@ let
 
         # TODO 1.0: remove
         out = @match fhead begin
-            f_(args0__; kwargs__)               => (f,[],args0,kwargs)
-            f_(args0__)                         => (f,[],args0,[])
-            f_(args0__; kwargs__) where paras__ => (f,paras,args0,kwargs)
-            f_(args0__) where paras__           => (f,paras,args0,[])
+            f_(args0__; kwargs__)                 => (f, [], args0, kwargs)
+            f_(args0__)                           => (f, [], args0, [])
+            f_(args0__; kwargs__) where {paras__} => (f, paras, args0, kwargs)
+            f_(args0__) where {paras__}           => (f, paras, args0, [])
         end
         if out==nothing
             error("Could not parse function-head: $fhead. Note that several `where` are not supported.")
@@ -264,23 +264,23 @@ let
                     a = a.args[1]
                 end
                 out = @match a begin
-                    ::::Tr_           => (nothing,nothing,Tr)
-                    ::T_::Tr_         => (nothing,T,Tr)
-                    x_Symbol::::Tr_   => (x,nothing,Tr)
-                    x_Symbol::T_::Tr_ => (x,T,Tr)
+                    ::::Tr_           => (nothing, nothing, Tr)
+                    ::T_::Tr_         => (nothing, T, Tr)
+                    x_Symbol::::Tr_   => (x, nothing, Tr)
+                    x_Symbol::T_::Tr_ => (x, T, Tr)
                 end
                 out!=nothing && break
             end
             out==nothing && error("No trait found in function signature")
-            arg,typ,trait0 = out
+            arg, typ, trait0 = out
             if typ===nothing # case `f(x::::Tr)`
                 typ = gensym()
                 push!(typs, typ)
             elseif length(typs)==0 # case `f(x::Integer::Tr)`
-                    # needs to be put into `f(x::I::Tr) where I<:Integer`
-                    typ_ = typ
-                    typ = gensym()
-                    push!(typs, :($typ<:$typ_))
+                # needs to be put into `f(x::I::Tr) where I<:Integer`
+                typ_ = typ
+                typ = gensym()
+                push!(typs, :($typ<:$typ_))
             end
             # Note other cases, e.g.
             # f(x::T::Tr) where T
@@ -328,17 +328,14 @@ let
             if !haskwargs
                 quote
                     $fname($(args1...)) where {$(typs...)} = (Base.@_inline_meta(); $fname(SimpleTraits.trait($trait),
-                                                                                           $(strip_tpara(strip_kw(args1))...)
-                                                                                           )
-                                                              )
+                                                                                           $(strip_tpara(strip_kw(args1))...)))
                 end
             else
                 quote
-                    $fname($(args1...);kwargs...) where {$(typs...)} = (Base.@_inline_meta(); $fname(SimpleTraits.trait($trait),
-                                                                                                     $(strip_tpara(strip_kw(args1))...);
-                                                                                                     kwargs...
-                                                                                                     )
-                                                                        )
+                    $fname($(args1...); kwargs...) where {$(typs...)} = (Base.@_inline_meta();
+                                                                         $fname(SimpleTraits.trait($trait),
+                                                                                $(strip_tpara(strip_kw(args1))...);
+                                                                                kwargs...))
                 end
             end
         else # trait dispatch function already defined
@@ -358,8 +355,8 @@ let
             nothing # dispatchfn
         end
         return rmlines(quote
-                       $dispatchfn
-                       Base.@__doc__ $ex
+                           $dispatchfn
+                           Base.@__doc__ $ex
                        end)
     end
 end
@@ -406,7 +403,6 @@ function strip_tpara(a::Expr)
     end
 end
 
-
 # [:(x::X=4)] -> [:x::X]
 # i.e. strips defaults arguments
 # also takes care of :...
@@ -422,7 +418,6 @@ function strip_kw(a::Expr)
         error("Cannot parse argument: $a")
     end
 end
-
 
 # insert dummy: ::X -> gensym()::X
 # also takes care of :...
@@ -470,7 +465,6 @@ findline(arg) = nothing
 #     @assert llvm_lines(fn_test, Args) == nlines
 # end
 
-
 """
     check_fast_traitdispatch(Tr, Args=(Int,), nlines=6, verbose=false)
 
@@ -508,17 +502,17 @@ macro check_fast_traitdispatch(Tr, Arg=:Int, verbose=false)
     nl_null = gensym()
     out = gensym()
     esc(quote
-        $test_fn_null(x) = 1
-        $nl_null = SimpleTraits.llvm_lines($test_fn_null, ($Arg,))
-        @traitfn $test_fn(x::::$Tr) = 1
-        @traitfn $test_fn(x::::(!$Tr)) = 2
-        $nl = SimpleTraits.llvm_lines($test_fn, ($Arg,))
-        $out = $nl == $nl_null
-        if $verbose && !$out
-            println("Number of llvm code lines $($nl) but should be $($nl_null).")
-        end
-        $out
-    end)
+            $test_fn_null(x) = 1
+            $nl_null = SimpleTraits.llvm_lines($test_fn_null, ($Arg,))
+            @traitfn $test_fn(x::::$Tr) = 1
+            @traitfn $test_fn(x::::(!$Tr)) = 2
+            $nl = SimpleTraits.llvm_lines($test_fn, ($Arg,))
+            $out = $nl == $nl_null
+            if $verbose && !$out
+                println("Number of llvm code lines $($nl) but should be $($nl_null).")
+            end
+            $out
+        end)
 end
 
 "Returns number of llvm-IR lines for a call of function `fn` with argument types `args`"
