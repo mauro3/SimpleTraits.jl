@@ -1,6 +1,6 @@
 # SimpleTraits
 
-[![Build Status](https://travis-ci.com/mauro3/SimpleTraits.jl.svg?branch=master)](https://travis-ci.com/mauro3/SimpleTraits.jl)
+[![Build Status](https://github.com/mauro3/SimpleTraits.jl/workflows/CI/badge.svg)](https://github.com/mauro3/SimpleTraits.jl/actions)
 [![Build Status](https://ci.appveyor.com/api/projects/status/github/mauro3/SimpleTraits.jl?branch=master&svg=true)](https://ci.appveyor.com/project/mauro3/simpletraits-jl/branch/master)
 [![pkgeval](https://juliahub.com/docs/SimpleTraits/pkgeval.svg)](https://juliahub.com/ui/Packages/SimpleTraits/pLp8z)
 
