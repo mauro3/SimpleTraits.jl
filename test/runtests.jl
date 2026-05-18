@@ -273,6 +273,21 @@ using Test
 @test f_dc(1) == 2
 end
 
+###
+# issue 98, macro hygiene
+@traitdef TraitIss98{X}
+macro register_Test(T)
+    return Expr(
+        :macrocall,
+        Symbol("@traitimpl"),
+        LineNumberNode(@__LINE__, @__FILE__),
+        Expr(:curly, :TraitIss98, T)
+    )
+end
+@register_Test(Int32)
+@test istrait(TraitIss98{Int32})
+@test !istrait(TraitIss98{Int64})
+
 ######
 # Other tests
 #####

@@ -139,8 +139,8 @@ macro traitimpl(tr)
         curly = Any[]
         paras = Any[]
         for (ty, v) in zip(typs, GenerateTypeVars{:upcase}())
-            push!(curly, Expr(:(<:), esc(v), esc(ty)))  #:($v<:$ty)
-            push!(paras, esc(v))
+            push!(curly, Expr(:(<:), v, esc(ty)))  #:($v<:$ty)
+            push!(paras, v)
         end
         arg = :(::Type{$trname{$(paras...)}})
         fnhead = :(SimpleTraits.trait($arg) where {$(curly...)})
